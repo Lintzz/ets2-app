@@ -1,29 +1,44 @@
 {
   "expo": {
-    "name": "ETS2_DashboardFixo",
-    "slug": "ETS2_DashboardFixo",
+    "name": "DashboardFixo",
+    "slug": "DashboardFixo",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "landscape",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0F1014"
     },
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0F1014"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.lintz.ets2dashboard"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "79fc9188-b228-4e9d-81d2-7ed867280f07"
+      }
     }
   }
 }
