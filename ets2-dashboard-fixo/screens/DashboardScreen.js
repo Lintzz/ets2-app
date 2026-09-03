@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Text, View, StyleSheet } from "react-native";
+import { View } from "react-native";
+import ConexaoScreen from "./ConexaoScreen";
 import DashboardWidget from "../components/DashboardWidget";
 import { useTelemetry } from "../hooks/useTelemetry";
 import styles from "../styles/dashboardStyles";
@@ -853,22 +854,33 @@ const rehydrateLayout = (layout) => {
 
 export default function DashboardScreen() {
   const [widgets, setWidgets] = useState([]);
-  const { isConnected, telemetry, pressKey, holdKeyDown, holdKeyUp } =
-    useTelemetry();
+  const {
+    estado,
+    telemetry,
+    servidor,
+    progresso,
+    pressKey,
+    holdKeyDown,
+    holdKeyUp,
+    conectarManual,
+    procurarNovamente,
+  } = useTelemetry();
 
   useEffect(() => {
     setWidgets(rehydrateLayout(INITIAL_WIDGETS));
   }, []);
 
-  if (!telemetry) {
+  // telemetry vem null com o jogo fechado e { jogoRodando:false, inMenu:true }
+  // no menu; nos dois casos ainda não há o que desenhar no painel.
+  if (!telemetry || telemetry.jogoRodando === false) {
     return (
-      <View style={styles.statusContainer}>
-        <StatusBar hidden />
-        <ActivityIndicator size="large" color="#FFA500" />
-        <Text style={styles.statusText}>
-          {!isConnected ? "A procurar servidor..." : "Aguardando Jogo..."}
-        </Text>
-      </View>
+      <ConexaoScreen
+        estado={estado}
+        servidor={servidor}
+        progresso={progresso}
+        conectarManual={conectarManual}
+        procurarNovamente={procurarNovamente}
+      />
     );
   }
 

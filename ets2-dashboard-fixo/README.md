@@ -19,7 +19,7 @@
 ---
 
 ## :book: Sobre
-Este projeto é um Dashboard customizado criado para rodar integrado ao Euro Truck Simulator 2. O objetivo é fornecer informações e telemetria essenciais do jogo em tempo real (através de Socket.IO / UDP) de forma acessível e com uma interface moderna, facilitando a experiência dos motoristas. 
+Este projeto é um Dashboard customizado criado para rodar integrado ao Euro Truck Simulator 2. O objetivo é fornecer informações e telemetria essenciais do jogo em tempo real (via WebSocket) de forma acessível e com uma interface moderna, facilitando a experiência dos motoristas. 
 
 Seja para automatizar a leitura de dados ou aprimorar sua simulação, o ETS2 Dashboard Fixo foi feito para entregar valor.
 
@@ -28,7 +28,9 @@ Seja para automatizar a leitura de dados ou aprimorar sua simulação, o ETS2 Da
 ## :sparkles: Features
 O que o seu projeto já faz? 
 - [x] Dashboard interativo e em tempo real para o ETS2
-- [x] Conexão direta com dados de telemetria (UDP/Socket.IO)
+- [x] Conexão direta com dados de telemetria (WebSocket, ~20 Hz)
+- [x] Descoberta automática do servidor pelo Wi-Fi, varrendo a própria sub-rede — sem precisar de cabo nem digitar IP
+- [x] Entrada manual de IP como alternativa, para redes onde a varredura não alcança
 - [x] Biblioteca de Widgets customizáveis
 - [x] Renderização avançada e dinâmica de ícones em SVG
 
@@ -58,7 +60,7 @@ As principais ferramentas, linguagens e bibliotecas usadas na construção do pr
 ## :rocket: Como Rodar
 
 ### Pré-requisitos
-Antes de começar, você vai precisar ter instalado na sua máquina o [Node.js](https://nodejs.org/en/) e o [Git](https://git-scm.com/). Além disso, precisará do [Expo CLI](https://docs.expo.dev/get-started/installation/) e de um emulador/dispositivo configurado, ou do app Expo Go no seu celular.
+Antes de começar, você vai precisar ter instalado na sua máquina o [Node.js](https://nodejs.org/en/) e o [Git](https://git-scm.com/). Além disso, precisará do [Expo CLI](https://docs.expo.dev/get-started/installation/) e de um dispositivo Android com um development build instalado (o Expo Go não serve, veja abaixo).
 
 ### Instalação e Execução
 
@@ -73,8 +75,38 @@ $ cd ets2-dashboard-fixo
 $ npm install
 
 # Execute a aplicação em modo de desenvolvimento
-$ npm run start
+$ npx expo start --dev-client
 ```
+
+> **Atenção:** o app usa módulos nativos (`expo-network`, AsyncStorage, gesture-handler, svg), então **não roda no Expo Go**. É preciso gerar um development build:
+>
+> ```bash
+> $ npx expo run:android
+> # ou, pela nuvem:
+> $ eas build --profile development --platform android
+> ```
+
+### Gerando o APK localmente
+
+```bash
+$ npx expo prebuild --platform android --clean
+
+# O template vem com MaxMetaspaceSize=512m, que estoura no build com a New
+# Architecture. Aumente antes de compilar (a pasta android/ e recriada pelo
+# prebuild, entao isso precisa ser refeito a cada prebuild):
+$ sed -i 's|^org.gradle.jvmargs=.*|org.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=2048m|' android/gradle.properties
+
+$ cd android
+$ JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleRelease
+```
+
+O APK sai em `android/app/build/outputs/apk/release/app-release.apk`. Ele e assinado com a chave de debug (padrao do template do Expo): instala por sideload normalmente, mas nao serve para a Play Store — para isso, gere um keystore proprio e ajuste o `signingConfig` de `release`.
+
+### Conectando ao servidor
+1. Abra o **ETS2 Servidor** no PC e confira o IP mostrado na janela.
+2. Ponha o tablet e o PC na **mesma rede** (Wi-Fi de casa serve; não precisa de cabo).
+3. Abra o app — ele encontra o servidor sozinho em alguns segundos e memoriza o endereço para as próximas vezes.
+4. Se não encontrar, digite o IP do PC na própria tela de conexão.
 
 ---
 
