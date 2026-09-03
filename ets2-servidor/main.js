@@ -1,34 +1,41 @@
-const { app, Tray, Menu, BrowserWindow, ipcMain } = require("electron");
+const { app, Tray, Menu, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const { fork } = require("child_process");
+const { garantirRegras } = require("./firewall");
+const { TCP_PORT } = require("./protocolo");
+const {
+  detectarPastasETS2,
+  instalarPlugin,
+  statusInstalacao,
+} = require("./instalador-plugin");
 
-if (require('electron-squirrel-startup')) return;
+if (require("electron-squirrel-startup")) app.quit();
 
 // Variáveis globais
 let tray = null;
 let mainWindow = null;
 let serverProcess = null;
-let serverIp = "Aguardando...";
+
+const info = {
+  serverIp: "Aguardando...",
+  enderecos: [],
+  port: TCP_PORT,
+  clienteIp: null,
+  clienteNome: null,
+  pareado: null,
+};
 
 // --- Funções de Comunicação ---
-function sendLogToWindow(message) {
+function enviarParaJanela(canal, dados) {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("server-log", message);
+    mainWindow.webContents.send(canal, dados);
   }
 }
 
-function updateServerInfo(ip) {
-  serverIp = ip;
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("server-info", { serverIp: ip });
-  }
-}
-
-function updateStatusDisplay(message) {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("server-status", message);
-  }
-}
+const sendLogToWindow = (message) => enviarParaJanela("server-log", message);
+const updateStatusDisplay = (message) => enviarParaJanela("server-status", message);
+const enviarInformacoes = () => enviarParaJanela("server-info", info);
 
 // --- Lógica Principal da Aplicação ---
 function createMainWindow() {
@@ -39,23 +46,24 @@ function createMainWindow() {
 
   mainWindow = new BrowserWindow({
     width: 800,
-    height: 600,
+    height: 640,
     minWidth: 650,
-    minHeight: 450,
+    minHeight: 480,
     title: "ETS2 Server Status",
     show: false,
-    // PROPRIEDADES VISUAIS CHAVE:
-    frame: false, // <--- REMOVE A BARRA DE TÍTULO E BOTÕES PADRÃO
-    autoHideMenuBar: true, // <--- REMOVE O MENU 'FILE', 'EDIT', etc.
-    titleBarStyle: "hidden", // (Fallback para outros sistemas)
-    // FIM DAS PROPRIEDADES VISUAIS
+    frame: false,
+    autoHideMenuBar: true,
+    titleBarStyle: "hidden",
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: false,
+      contextIsolation: true,
     },
   });
 
   mainWindow.loadFile(path.join(__dirname, "status.html"));
+
+  mainWindow.once("ready-to-show", () => mainWindow.show());
 
   // Fechar a janela principal apenas oculta, não encerra o servidor
   mainWindow.on("close", (event) => {
@@ -65,9 +73,7 @@ function createMainWindow() {
     }
   });
 
-  mainWindow.webContents.on("did-finish-load", () => {
-    updateServerInfo(serverIp);
-  });
+  mainWindow.webContents.on("did-finish-load", enviarInformacoes);
 }
 
 function startServerProcess() {
@@ -79,28 +85,71 @@ function startServerProcess() {
   serverProcess = fork(path.join(__dirname, "server.js"), [], {
     silent: false,
     stdio: ["inherit", "inherit", "inherit", "ipc"],
+    env: {
+      ...process.env,
+      // O server.js guarda o pareamento aqui. Dentro do asar empacotado o
+      // __dirname é somente-leitura, então precisa ser o userData.
+      ETS2_USER_DATA: app.getPath("userData"),
+    },
   });
 
   serverProcess.on("message", (message) => {
-    if (message.type === "log") {
-      sendLogToWindow(message.message);
-    } else if (message.type === "status") {
-      updateStatusDisplay(message.message);
-    } else if (message.type === "server-ip") {
-      updateServerInfo(message.ip);
+    switch (message.type) {
+      case "log":
+        sendLogToWindow(message.message);
+        break;
+      case "status":
+        updateStatusDisplay(message.message);
+        break;
+      case "server-ip":
+        info.serverIp = message.ip;
+        info.enderecos = message.enderecos || [];
+        info.port = message.port || TCP_PORT;
+        enviarInformacoes();
+        break;
+      case "cliente":
+        info.clienteIp = message.ip;
+        info.clienteNome = message.nome || null;
+        enviarInformacoes();
+        break;
+      case "pareamento":
+        info.pareado = message.pareado;
+        enviarInformacoes();
+        break;
     }
   });
 
-  sendLogToWindow(
-    ">>> Processo do Servidor (server.js) iniciado como processo filho."
-  );
+  serverProcess.on("exit", (code, signal) => {
+    if (!app.isQuitting && signal !== "SIGKILL") {
+      sendLogToWindow(`Servidor encerrou inesperadamente (código ${code}).`);
+    }
+  });
+
+  sendLogToWindow(">>> Processo do Servidor (server.js) iniciado como processo filho.");
+}
+
+async function configurarFirewall() {
+  const r = await garantirRegras();
+
+  for (const nome of r.criadas) {
+    sendLogToWindow(`Firewall: regra "${nome}" criada.`);
+  }
+  if (r.jaExistiam.length > 0) {
+    sendLogToWindow(`Firewall: regras já configuradas (${r.jaExistiam.join(", ")}).`);
+  }
+  for (const falha of r.falharam) {
+    sendLogToWindow(
+      `Firewall: não foi possível criar "${falha.nome}" (precisa de administrador). ` +
+        `Abra o Prompt como admin e rode: ${falha.comando}`
+    );
+  }
 }
 
 app.whenReady().then(() => {
   createMainWindow();
   startServerProcess();
+  configurarFirewall();
 
-  // Cria o menu de contexto apenas para remover o menu padrão do Electron
   if (process.platform === "darwin") {
     Menu.setApplicationMenu(Menu.buildFromTemplate([]));
   }
@@ -110,18 +159,18 @@ app.whenReady().then(() => {
   const contextMenu = Menu.buildFromTemplate([
     {
       label: "Mostrar/Esconder Status",
-      click: () => {
-        createMainWindow();
-      },
+      click: () => createMainWindow(),
     },
     {
       label: "Reiniciar Servidor",
       click: () => {
-        sendLogToWindow(
-          "Ação: Reiniciando servidor através do menu de contexto..."
-        );
+        sendLogToWindow("Ação: Reiniciando servidor através do menu de contexto...");
         startServerProcess();
       },
+    },
+    {
+      label: "Esquecer aparelho pareado",
+      click: () => esquecerPareamento(),
     },
     { type: "separator" },
     { label: "Sair", click: () => app.quit() },
@@ -131,23 +180,71 @@ app.whenReady().then(() => {
   tray.setContextMenu(contextMenu);
 });
 
+function esquecerPareamento() {
+  if (!serverProcess) return;
+  serverProcess.send({ type: "esquecer-pareamento" });
+  sendLogToWindow("Ação: apagando o aparelho pareado...");
+}
+
 app.on("window-all-closed", (event) => {
   event.preventDefault();
 });
 
 app.on("before-quit", () => {
+  app.isQuitting = true;
   if (serverProcess) {
-    sendLogToWindow(
-      "Encerrando processo do servidor antes de fechar o Electron."
-    );
+    sendLogToWindow("Encerrando processo do servidor antes de fechar o Electron.");
     serverProcess.kill("SIGKILL");
   }
-  app.isQuitting = true;
 });
 
-// --- HANDLERS IPC PARA CONTROLE DA JANELA E REINÍCIO ---
+// --- INSTALAÇÃO DO PLUGIN NO JOGO ---
 
-// 1. Recebe comandos de controle da janela do status_renderer.js
+// Empacotado, a DLL vai como extraResource; em desenvolvimento fica em recursos/.
+function caminhoDaDll() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "PluginETS2.dll")
+    : path.join(__dirname, "recursos", "PluginETS2.dll");
+}
+
+const ARQUIVO_CONFIG = () => path.join(app.getPath("userData"), "config.json");
+
+function lerConfig() {
+  try {
+    return JSON.parse(fs.readFileSync(ARQUIVO_CONFIG(), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function salvarConfig(novo) {
+  try {
+    fs.writeFileSync(ARQUIVO_CONFIG(), JSON.stringify({ ...lerConfig(), ...novo }, null, 2));
+  } catch (e) {
+    sendLogToWindow(`Não foi possível salvar a configuração: ${e.message}`);
+  }
+}
+
+// Pasta em uso: a que o usuário escolheu antes, ou a primeira detectada.
+async function pastaAtualDoJogo() {
+  const salva = lerConfig().pastaETS2;
+  if (salva && statusInstalacao(salva, caminhoDaDll()).valida) return salva;
+
+  const detectadas = await detectarPastasETS2();
+  return detectadas[0] || null;
+}
+
+async function estadoDoPlugin() {
+  const pasta = await pastaAtualDoJogo();
+  const detectadas = await detectarPastasETS2();
+  const base = { detectadas, dll: caminhoDaDll() };
+
+  if (!pasta) return { ...base, valida: false, pastaJogo: null };
+  return { ...base, ...statusInstalacao(pasta, caminhoDaDll()) };
+}
+
+// --- HANDLERS IPC ---
+
 ipcMain.on("window-control", (event, action) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
 
@@ -156,27 +253,69 @@ ipcMain.on("window-control", (event, action) => {
       mainWindow.minimize();
       break;
     case "maximize":
-      if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize();
-      } else {
-        mainWindow.maximize();
-      }
+      if (mainWindow.isMaximized()) mainWindow.unmaximize();
+      else mainWindow.maximize();
       break;
     case "close":
-      mainWindow.close(); // Isso aciona o evento 'close' e oculta a janela
+      mainWindow.close();
       break;
   }
 });
 
-// 2. Reinicia o servidor
-ipcMain.on("restart-server", () => {
-  startServerProcess();
+ipcMain.on("restart-server", () => startServerProcess());
+
+ipcMain.on("esquecer-pareamento", () => esquecerPareamento());
+
+ipcMain.on("ready-for-info", () => enviarInformacoes());
+
+// --- HANDLERS IPC DO INSTALADOR DE PLUGIN ---
+
+ipcMain.handle("plugin:estado", () => estadoDoPlugin());
+
+ipcMain.handle("plugin:escolher-pasta", async () => {
+  const escolha = await dialog.showOpenDialog(mainWindow, {
+    title: "Selecione a pasta do Euro Truck Simulator 2",
+    properties: ["openDirectory"],
+    defaultPath: (await pastaAtualDoJogo()) || undefined,
+    buttonLabel: "Usar esta pasta",
+  });
+
+  if (escolha.canceled || escolha.filePaths.length === 0) return estadoDoPlugin();
+
+  const pasta = escolha.filePaths[0];
+  const status = statusInstalacao(pasta, caminhoDaDll());
+
+  if (!status.valida) {
+    sendLogToWindow(
+      `A pasta escolhida não parece ser a do ETS2: ${pasta} ` +
+        "(esperava encontrar bin\win_x64\eurotrucks2.exe)."
+    );
+    return { ...(await estadoDoPlugin()), erro: "pasta-invalida" };
+  }
+
+  salvarConfig({ pastaETS2: pasta });
+  sendLogToWindow(`Pasta do ETS2 definida: ${pasta}`);
+  return estadoDoPlugin();
 });
 
-// 3. Responde à solicitação de informações da janela de status
-ipcMain.on("ready-for-info", (event) => {
-  event.reply("server-info", {
-    serverIp: serverIp,
-    port: 3000,
-  });
+ipcMain.handle("plugin:instalar", async () => {
+  const pasta = await pastaAtualDoJogo();
+  if (!pasta) {
+    return { ok: false, mensagem: "Escolha primeiro a pasta do Euro Truck Simulator 2." };
+  }
+
+  const resultado = instalarPlugin(pasta, caminhoDaDll());
+  sendLogToWindow(
+    resultado.ok
+      ? `Plugin: ${resultado.mensagem} (${resultado.destino})`
+      : `Plugin: ${resultado.mensagem}`
+  );
+
+  if (resultado.ok) salvarConfig({ pastaETS2: pasta });
+  return { ...resultado, estado: await estadoDoPlugin() };
+});
+
+ipcMain.handle("plugin:abrir-pasta", async () => {
+  const pasta = await pastaAtualDoJogo();
+  if (pasta) shell.openPath(path.join(pasta, "bin", "win_x64", "plugins"));
 });

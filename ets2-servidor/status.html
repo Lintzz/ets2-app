@@ -3,119 +3,320 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
     <title>ETS2 Dashboard Server Status</title>
-    <!-- Inclui Tailwind CSS para estilização moderna e rápida -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!--
+      O CSS é local de propósito: a versão anterior carregava o Tailwind por CDN,
+      e o app abria sem nenhum estilo quando o PC estava sem internet — que é
+      justamente o cenário de quem só liga o PC para jogar.
+    -->
     <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #111827;
+        --surface: #1f2937;
+        --surface-2: #1a202c;
+        --border: #374151;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --accent: #22c55e;
+        --accent-dark: #15803d;
+        --danger: #dc2626;
+      }
+
       body {
-        font-family: "Inter", sans-serif;
-        /* Garante que o corpo da página não tenha scroll */
+        font-family: "Segoe UI", Inter, system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
         overflow: hidden;
         display: flex;
         flex-direction: column;
-        height: 100vh;
+        font-size: 14px;
       }
 
-      /* Estiliza o cabeçalho para permitir arrastar e ignora o scroll */
-      .custom-title-bar {
-        /* Propriedade ESSENCIAL para arrastar a janela (exceto nos botões) */
+      /* Barra de título customizada (a janela é frameless) */
+      header {
         -webkit-app-region: drag;
+        background: var(--surface);
+        border-bottom: 2px solid var(--accent);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 0.5rem 0 1rem;
+        height: 40px;
+        flex-shrink: 0;
       }
 
-      /* Impede que os botões customizados sejam arrastáveis */
+      .titulo {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+      }
+
+      .controles {
+        display: flex;
+        gap: 0.25rem;
+      }
+
       .window-control {
         -webkit-app-region: no-drag;
+        width: 32px;
+        height: 32px;
+        border: 0;
+        border-radius: 9999px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s, color 0.15s;
+      }
+      .window-control:hover {
+        background: var(--border);
+        color: #fff;
+      }
+      #close-btn:hover {
+        background: var(--danger);
+        color: #fff;
       }
 
-      /* Classe para o container principal de conteúdo - usa flex-col */
-      .main-content {
-        flex-grow: 1;
+      main {
+        flex: 1;
         padding: 1rem;
-        overflow: hidden;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
+        max-width: 60rem;
+        width: 100%;
+        margin: 0 auto;
       }
 
-      /* Define a altura máxima para a caixa de logs, permitindo apenas ela ter scroll */
+      #main-status-panel {
+        background: var(--surface);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        flex-shrink: 0;
+        transition: background 0.3s;
+        border-left: 4px solid var(--border);
+      }
+      #main-status-panel.ok {
+        background: #14532d;
+        border-left-color: var(--accent);
+      }
+      #main-status-panel.espera {
+        background: #7c2d12;
+        border-left-color: #f97316;
+      }
+      #main-status-panel.erro {
+        background: #7f1d1d;
+        border-left-color: var(--danger);
+      }
+
+      #server-status {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+      }
+
+      .linha {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 0.25rem;
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+      }
+      .linha b {
+        font-weight: 500;
+      }
+      .valor {
+        font-family: Consolas, "Courier New", monospace;
+        color: var(--accent);
+      }
+      .valor.neutro {
+        color: var(--text);
+      }
+
+      h2 {
+        font-size: 1rem;
+        color: var(--accent);
+        margin-bottom: 0.6rem;
+        flex-shrink: 0;
+      }
+
+      .acoes {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        flex-shrink: 0;
+      }
+
+      button.acao {
+        flex: 1;
+        border: 0;
+        border-radius: 0.5rem;
+        padding: 0.6rem 1rem;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: #fff;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      #restart-server-btn {
+        background: var(--accent-dark);
+      }
+      #restart-server-btn:hover {
+        background: var(--accent);
+      }
+      #forget-device-btn {
+        background: #4b5563;
+      }
+      #forget-device-btn:hover {
+        background: var(--danger);
+      }
+
+      /* Painel de instalação do plugin */
+      #plugin-panel {
+        background: var(--surface);
+        border-radius: 0.5rem;
+        padding: 0.85rem 1rem;
+        margin-bottom: 1rem;
+        flex-shrink: 0;
+        border-left: 4px solid var(--border);
+      }
+      #plugin-panel.ok {
+        border-left-color: var(--accent);
+      }
+      #plugin-panel.pendente {
+        border-left-color: #f97316;
+      }
+      #plugin-panel.ausente {
+        border-left-color: var(--danger);
+      }
+
+      .plugin-topo {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+      #plugin-estado {
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      #plugin-caminho {
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 0.72rem;
+        color: var(--muted);
+        margin-top: 0.35rem;
+        word-break: break-all;
+      }
+      .plugin-botoes {
+        display: flex;
+        gap: 0.4rem;
+        flex-shrink: 0;
+      }
+      button.mini {
+        border: 0;
+        border-radius: 0.4rem;
+        padding: 0.45rem 0.8rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #fff;
+        cursor: pointer;
+        background: #4b5563;
+        transition: background 0.15s;
+        white-space: nowrap;
+      }
+      button.mini:hover:not(:disabled) {
+        background: #6b7280;
+      }
+      button.mini.destaque {
+        background: var(--accent-dark);
+      }
+      button.mini.destaque:hover:not(:disabled) {
+        background: var(--accent);
+      }
+      button.mini:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+
+      .log-wrap {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
+      }
+
       #log-box {
-        background-color: #1a202c; /* Cor de fundo mais escura para o log */
+        background: var(--surface-2);
         border-radius: 0.5rem;
         padding: 0.75rem;
-        overflow-y: auto; /* Apenas o log terá scroll vertical */
-        flex-grow: 1; /* Ocupa o espaço vertical restante */
+        overflow-y: auto;
+        flex: 1;
         font-size: 0.75rem;
+        font-family: Consolas, "Courier New", monospace;
         white-space: pre-wrap;
         line-height: 1.5;
-        box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.6);
-        /* Garante que o logbox tenha uma altura mínima para aparecer */
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
         min-height: 100px;
       }
+      #log-box div {
+        padding: 0.15rem 0;
+        border-bottom: 1px solid #2d3748;
+      }
+      #log-box div:last-child {
+        border-bottom: 0;
+      }
 
-      /* Ajuste do rodapé para fixar ao fundo */
       footer {
         padding-top: 0.5rem;
-        padding-bottom: 0.5rem;
+        margin-top: 0.75rem;
+        border-top: 2px solid var(--accent-dark);
+        font-size: 0.7rem;
+        text-align: center;
+        color: #6b7280;
+        flex-shrink: 0;
       }
     </style>
   </head>
-  <body class="bg-gray-900 text-gray-200">
-    <!-- BARRA DE TÍTULO CUSTOMIZADA -->
-    <header
-      class="custom-title-bar bg-gray-800 border-b-2 border-green-500 flex justify-between items-center px-4 py-1.5 h-10"
-    >
-      <div class="flex items-center">
-        <span class="mr-2 text-green-500 text-lg">🚛</span>
-        <span class="text-sm font-semibold">ETS2 Server Status</span>
+  <body>
+    <header>
+      <div class="titulo">
+        <span style="color: var(--accent); font-size: 1.1rem">🚛</span>
+        <span>ETS2 Server Status</span>
       </div>
 
-      <!-- BOTÕES DE CONTROLE DA JANELA -->
-      <div class="flex">
-        <button
-          id="minimize-btn"
-          class="window-control hover:bg-gray-700 w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition duration-150"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            fill="currentColor"
-            class="bi bi-dash"
-            viewBox="0 0 16 16"
-          >
-            <path
-              d="M4 8a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 4 8"
-            />
+      <div class="controles">
+        <button id="minimize-btn" class="window-control" title="Minimizar">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M4 8a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 4 8" />
           </svg>
         </button>
-        <button
-          id="maximize-btn"
-          class="window-control hover:bg-gray-700 w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition duration-150 mx-1"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            fill="currentColor"
-            class="bi bi-square"
-            viewBox="0 0 16 16"
-          >
+        <button id="maximize-btn" class="window-control" title="Maximizar">
+          <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
             <path
               d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"
             />
           </svg>
         </button>
-        <button
-          id="close-btn"
-          class="window-control hover:bg-red-600 w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition duration-150"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            fill="currentColor"
-            class="bi bi-x-lg"
-            viewBox="0 0 16 16"
-          >
+        <button id="close-btn" class="window-control" title="Fechar">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
             <path
               d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"
             />
@@ -124,59 +325,54 @@
       </div>
     </header>
 
-    <!-- CONTEÚDO PRINCIPAL (LAYOUT VERTICAL PARA FORÇAR LOG PARA BAIXO) -->
-    <main class="main-content">
-      <div
-        class="max-w-4xl w-full mx-auto flex-grow flex flex-col overflow-hidden"
-      >
-        <!-- 1. PAINEL DE STATUS PRINCIPAL (Fixo no Topo da Área de Conteúdo) -->
-        <div
-          id="main-status-panel"
-          class="mb-4 p-4 rounded-lg shadow-xl transition duration-300 flex-shrink-0 bg-gray-800"
-        >
-          <div id="server-status" class="text-lg font-semibold mb-2">
-            Status do Servidor:
-            <span id="status-text" class="text-gray-400">Iniciando...</span>
-          </div>
-          <div id="ip-address" class="text-sm text-gray-400">
-            IP Servidor:
-            <span id="ip-text" class="font-mono text-xs text-green-400"
-              >Aguardando...</span
-            >
-          </div>
-          <div id="client-info" class="text-sm text-gray-400 mt-1">
-            Cliente Conectado:
-            <span id="client-text" class="font-mono text-xs">Nenhum</span>
-          </div>
+    <main>
+      <div id="main-status-panel">
+        <div id="server-status">
+          Status: <span id="status-text">Iniciando...</span>
         </div>
-
-        <!-- 2. PAINEL DE AÇÕES (Fixo - logo abaixo do status) -->
-        <div class="mb-4 flex-shrink-0">
-          <h2 class="text-xl font-bold mb-3 text-green-500">Ações</h2>
-          <button
-            id="restart-server-btn"
-            class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50"
-          >
-            <span class="mr-1">🔄</span> Reiniciar Servidor
-          </button>
+        <div class="linha">
+          <b>IP do servidor:</b>
+          <span id="ip-text" class="valor">Aguardando...</span>
         </div>
-
-        <!-- 3. PAINEL DE LOGS (Ocupa o espaço restante e TEM SCROLL) -->
-        <div class="flex flex-col flex-grow overflow-hidden">
-          <h2 class="text-xl font-bold mb-3 text-green-500 flex-shrink-0">
-            Log de Eventos
-          </h2>
-          <div id="log-box">
-            <!-- Logs serão injetados aqui -->
-          </div>
+        <div class="linha">
+          <b>Outros endereços:</b>
+          <span id="ips-text" class="valor neutro">—</span>
+        </div>
+        <div class="linha">
+          <b>Cliente conectado:</b>
+          <span id="client-text" class="valor neutro">Nenhum</span>
+        </div>
+        <div class="linha">
+          <b>Aparelho pareado:</b>
+          <span id="paired-text" class="valor neutro">Nenhum</span>
         </div>
       </div>
 
-      <footer
-        class="mt-4 pt-2 border-t-2 border-green-700 text-xs text-center text-gray-500 flex-shrink-0"
-      >
-        Dashboard Server v1.0 | Desenvolvido com Electron
-      </footer>
+      <h2>Ações</h2>
+      <div class="acoes">
+        <button id="restart-server-btn" class="acao">🔄 Reiniciar Servidor</button>
+        <button id="forget-device-btn" class="acao">📵 Esquecer aparelho</button>
+      </div>
+
+      <h2>Plugin no jogo</h2>
+      <div id="plugin-panel">
+        <div class="plugin-topo">
+          <span id="plugin-estado">Verificando...</span>
+          <div class="plugin-botoes">
+            <button id="plugin-escolher-btn" class="mini">📁 Escolher pasta</button>
+            <button id="plugin-instalar-btn" class="mini destaque">⬇ Instalar plugin</button>
+            <button id="plugin-abrir-btn" class="mini">Abrir</button>
+          </div>
+        </div>
+        <div id="plugin-caminho">—</div>
+      </div>
+
+      <div class="log-wrap">
+        <h2>Log de Eventos</h2>
+        <div id="log-box"></div>
+      </div>
+
+      <footer>Dashboard Server | Electron</footer>
     </main>
 
     <script src="status_renderer.js"></script>

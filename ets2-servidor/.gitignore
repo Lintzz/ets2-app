@@ -10,4 +10,4 @@ node_modules/
 *.nupkg
 *.zip
 .expo/
-/bin/
+/bin/pareamento.json

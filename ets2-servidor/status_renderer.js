@@ -1,117 +1,166 @@
 // ETS2_Servidor/status_renderer.js
-// Roda no Processo de Renderização do Electron (Janela de Status)
+// Roda no processo de renderização, sem acesso ao Node: tudo passa pela API
+// exposta em preload.js como window.servidor.
 
-const { ipcRenderer } = require("electron");
-
-// --- Elementos DOM ---
 const statusText = document.getElementById("status-text");
 const ipText = document.getElementById("ip-text");
+const ipsText = document.getElementById("ips-text");
 const clientText = document.getElementById("client-text");
+const pairedText = document.getElementById("paired-text");
 const logBox = document.getElementById("log-box");
 const mainStatusPanel = document.getElementById("main-status-panel");
-const restartButton = document.getElementById("restart-server-btn");
 
-// Botões de controle de janela
-const minimizeBtn = document.getElementById("minimize-btn");
-const maximizeBtn = document.getElementById("maximize-btn");
-const closeBtn = document.getElementById("close-btn");
+const MAX_LINHAS_LOG = 500;
 
-// --- Funções de UI ---
-
-// Função para adicionar log e rolar para o final
 function addLog(message) {
-  const logEntry = document.createElement("div");
-  // Adiciona uma classe para evitar quebra de linha em longas mensagens
-  logEntry.className = "py-0.5 border-b border-gray-700 last:border-b-0";
-  logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-  logBox.appendChild(logEntry);
+  const entrada = document.createElement("div");
+  entrada.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+  logBox.appendChild(entrada);
+
+  // Sem isto o log crescia sem limite numa sessão longa.
+  while (logBox.childElementCount > MAX_LINHAS_LOG) {
+    logBox.removeChild(logBox.firstChild);
+  }
   logBox.scrollTop = logBox.scrollHeight;
 }
 
-// Função para atualizar o painel principal com base no status
-function updateStatusDisplay(status, clientIp = null) {
+function updateStatusDisplay(status) {
   statusText.textContent = status;
+  mainStatusPanel.classList.remove("ok", "espera", "erro");
 
-  // Remove todas as classes de cor de fundo
-  mainStatusPanel.classList.remove(
-    "bg-gray-800",
-    "bg-red-900",
-    "bg-green-900",
-    "bg-orange-900"
-  );
-
-  // Define a cor com base no status atual
-  if (status.includes("Aguardando conex")) {
-    mainStatusPanel.classList.add("bg-gray-800");
-    clientText.textContent = "Nenhum";
-  } else if (status.includes("conectado") && status.includes("a transmitir")) {
-    mainStatusPanel.classList.add("bg-green-900");
-    clientText.textContent = clientIp || "Conectado";
+  if (status.includes("transmitir")) {
+    mainStatusPanel.classList.add("ok");
+  } else if (status.includes("menu") || status.includes("pausado")) {
+    mainStatusPanel.classList.add("espera");
   } else if (
-    status.includes("aguardar dados") ||
-    status.includes("a transmitir")
+    status.includes("não detectado") ||
+    status.includes("Erro") ||
+    status.includes("desatualizado")
   ) {
-    // Usa Laranja para o estado de "Conectado, mas aguardando dados do jogo"
-    mainStatusPanel.classList.add("bg-orange-900");
-    clientText.textContent = clientIp || "Conectado";
-  } else if (status.includes("Jogo (ETS2) não detectado")) {
-    mainStatusPanel.classList.add("bg-red-900");
-    clientText.textContent = "Nenhum";
-  } else if (status.includes("Erro")) {
-    mainStatusPanel.classList.add("bg-red-900");
+    mainStatusPanel.classList.add("erro");
   }
 }
 
-// --- LÓGICA DE CONTROLE DA JANELA ---
+// --- Controles da janela ---
 
-minimizeBtn.addEventListener("click", () => {
-  ipcRenderer.send("window-control", "minimize");
+document.getElementById("minimize-btn").addEventListener("click", () => {
+  window.servidor.minimizar();
+});
+document.getElementById("maximize-btn").addEventListener("click", () => {
+  window.servidor.maximizar();
+});
+document.getElementById("close-btn").addEventListener("click", () => {
+  window.servidor.fechar();
 });
 
-maximizeBtn.addEventListener("click", () => {
-  ipcRenderer.send("window-control", "maximize");
+// --- Ações ---
+
+document.getElementById("restart-server-btn").addEventListener("click", () => {
+  window.servidor.reiniciar();
+  addLog("Ação: enviando comando para reiniciar o servidor...");
 });
 
-closeBtn.addEventListener("click", () => {
-  ipcRenderer.send("window-control", "close");
+document.getElementById("forget-device-btn").addEventListener("click", () => {
+  window.servidor.esquecerAparelho();
 });
 
-// --- LÓGICA DE COMUNICAÇÃO (IPC) ---
+// --- Eventos vindos do processo principal ---
 
-// Listener para o botão de Reiniciar
-restartButton.addEventListener("click", () => {
-  ipcRenderer.send("restart-server");
-  addLog("Ação: Enviando comando para reiniciar o servidor...");
-});
+window.servidor.aoReceberLog(addLog);
 
-// Listener para Logs do Processo Principal
-ipcRenderer.on("server-log", (event, message) => {
-  addLog(message);
-
-  // Lógica para detecção de IP na mensagem
-  if (message.includes("IP do cliente:")) {
-    const ipMatch = message.match(/\(IP do cliente: (.*)\)/);
-    const ip = ipMatch ? ipMatch[1] : null;
-    if (ip) ipcRenderer.send("update-ip", ip); // Envia o IP para o main.js para atualização global
-    updateStatusDisplay("Cliente conectado com sucesso!", ip);
-  }
-});
-
-// Listener para Atualização de Status (mensagens frequentes)
-ipcRenderer.on("server-status", (event, message) => {
+// O status agora só chega quando muda de verdade (antes era 4x por segundo e
+// enchia o log), então dá para registrar cada mudança.
+window.servidor.aoMudarStatus((message) => {
   updateStatusDisplay(message);
-  // Para não lotar o logbox, só adicionamos se o status mudar ou for importante.
-  // Neste caso, vamos adicionar para manter a visibilidade do que está acontecendo.
-  // Se isso ficar muito lotado, podemos otimizar para logar apenas a cada 5 segundos.
   addLog(`Status: ${message}`);
 });
 
-// Listener para o IP do Servidor (informação inicial)
-ipcRenderer.on("server-info", (event, info) => {
-  if (info.serverIp) {
-    ipText.textContent = info.serverIp;
+window.servidor.aoReceberInformacoes((info) => {
+  if (!info) return;
+
+  ipText.textContent = info.port ? `${info.serverIp}:${info.port}` : info.serverIp;
+
+  const outros = (info.enderecos || [])
+    .filter((e) => e.ip !== info.serverIp)
+    .map((e) => `${e.ip} (${e.nome})`);
+  ipsText.textContent = outros.length > 0 ? outros.join(" · ") : "—";
+
+  clientText.textContent = info.clienteIp
+    ? `${info.clienteNome || "aparelho"} — ${info.clienteIp}`
+    : "Nenhum";
+
+  pairedText.textContent = info.pareado ? info.pareado.nome : "Nenhum";
+});
+
+// --- Instalação do plugin no jogo ---
+
+const pluginPanel = document.getElementById("plugin-panel");
+const pluginEstado = document.getElementById("plugin-estado");
+const pluginCaminho = document.getElementById("plugin-caminho");
+const btnEscolher = document.getElementById("plugin-escolher-btn");
+const btnInstalar = document.getElementById("plugin-instalar-btn");
+const btnAbrir = document.getElementById("plugin-abrir-btn");
+
+function pintarPlugin(estado) {
+  pluginPanel.classList.remove("ok", "pendente", "ausente");
+
+  if (!estado || !estado.valida) {
+    pluginPanel.classList.add("ausente");
+    pluginEstado.textContent = "Pasta do ETS2 não encontrada";
+    pluginCaminho.textContent =
+      "Clique em \"Escolher pasta\" e aponte para a pasta do Euro Truck Simulator 2.";
+    btnInstalar.disabled = true;
+    btnAbrir.disabled = true;
+    return;
+  }
+
+  btnAbrir.disabled = false;
+
+  if (estado.atualizado) {
+    pluginPanel.classList.add("ok");
+    pluginEstado.textContent = "✅ Plugin instalado e atualizado";
+    btnInstalar.disabled = false;
+    btnInstalar.textContent = "Reinstalar";
+  } else if (estado.instalado) {
+    pluginPanel.classList.add("pendente");
+    pluginEstado.textContent = "⚠️ Plugin instalado, mas de outra versão";
+    btnInstalar.disabled = false;
+    btnInstalar.textContent = "⬇ Atualizar plugin";
+  } else {
+    pluginPanel.classList.add("pendente");
+    pluginEstado.textContent = "Plugin ainda não instalado";
+    btnInstalar.disabled = false;
+    btnInstalar.textContent = "⬇ Instalar plugin";
+  }
+
+  pluginCaminho.textContent = estado.destino || estado.pastaJogo;
+}
+
+async function atualizarPlugin() {
+  pintarPlugin(await window.servidor.plugin.estado());
+}
+
+btnEscolher.addEventListener("click", async () => {
+  btnEscolher.disabled = true;
+  pintarPlugin(await window.servidor.plugin.escolherPasta());
+  btnEscolher.disabled = false;
+});
+
+btnInstalar.addEventListener("click", async () => {
+  btnInstalar.disabled = true;
+  pluginEstado.textContent = "Instalando...";
+
+  const r = await window.servidor.plugin.instalar();
+  addLog(`Plugin: ${r.mensagem}`);
+  pintarPlugin(r.estado);
+
+  if (r.ok && !r.jaAtualizado) {
+    addLog("Reinicie o Euro Truck Simulator 2 para o novo plugin ser carregado.");
   }
 });
 
-// Envia mensagem para o processo principal para pedir informações iniciais
-ipcRenderer.send("ready-for-info");
+btnAbrir.addEventListener("click", () => window.servidor.plugin.abrirPasta());
+
+atualizarPlugin();
+
+window.servidor.pedirInformacoes();
