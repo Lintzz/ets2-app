@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld("servidor", {
     escolherPasta: () => ipcRenderer.invoke("plugin:escolher-pasta"),
     instalar: () => ipcRenderer.invoke("plugin:instalar"),
     abrirPasta: () => ipcRenderer.invoke("plugin:abrir-pasta"),
+    verificarAtualizacao: () => ipcRenderer.invoke("plugin:verificar-atualizacao"),
   },
 
   // Eventos

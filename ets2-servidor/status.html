@@ -218,6 +218,15 @@
         font-weight: 600;
         font-size: 0.9rem;
       }
+      #plugin-origem {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 0.35rem;
+      }
+      #plugin-origem .fonte {
+        color: var(--accent);
+        font-weight: 600;
+      }
       #plugin-caminho {
         font-family: Consolas, "Courier New", monospace;
         font-size: 0.72rem;
@@ -361,9 +370,11 @@
           <div class="plugin-botoes">
             <button id="plugin-escolher-btn" class="mini">📁 Escolher pasta</button>
             <button id="plugin-instalar-btn" class="mini destaque">⬇ Instalar plugin</button>
+            <button id="plugin-verificar-btn" class="mini">🔄 Verificar</button>
             <button id="plugin-abrir-btn" class="mini">Abrir</button>
           </div>
         </div>
+        <div id="plugin-origem">—</div>
         <div id="plugin-caminho">—</div>
       </div>
 

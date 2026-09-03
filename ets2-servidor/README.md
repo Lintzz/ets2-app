@@ -33,7 +33,7 @@ Ele utiliza um addon nativo em C++ para ler dados da memória do jogo em alta pe
 - [x] **Controle Remoto de Teclas:** comandos remotos via RobotJS, restritos a uma allowlist de teclas — nenhum cliente consegue digitar texto arbitrário no PC.
 - [x] **Pareamento de Aparelho:** o primeiro tablet que conecta é memorizado; os demais são recusados até você clicar em "Esquecer aparelho".
 - [x] **Firewall Automático:** cria as regras de entrada para TCP 3000 e UDP 48888 em todos os perfis de rede (o motivo mais comum de funcionar no cabo e não no Wi-Fi).
-- [x] **Instalação do Plugin pelo App:** detecta a pasta do ETS2 automaticamente (lê as bibliotecas do Steam), cria a pasta `plugins` e instala a `PluginETS2.dll` que acompanha o servidor — com backup da versão anterior. Dá para escolher a pasta manualmente se a detecção falhar.
+- [x] **Instalação do Plugin pelo App:** detecta a pasta do ETS2 automaticamente (lê as bibliotecas do Steam), cria a pasta `plugins` e instala a DLL — com backup da versão anterior. A DLL vem da **última release de [ets2-plugin](https://github.com/Lintzz/ets2-plugin/releases)**, então o plugin fica sempre em dia sem precisar reinstalar o servidor; sem internet, usa a cópia que acompanha o instalador.
 - [x] **Interface Oculta e Tray:** Aplicação Electron com janela customizada e suporte a modo silencioso no System Tray.
 
 ---
@@ -100,6 +100,14 @@ Não precisa copiar DLL na mão. Abra o **ETS2 Servidor** e use o painel **"Plug
 3. Reinicie o jogo.
 
 O painel mostra o estado atual: *não instalado*, *instalado mas de outra versão* ou *instalado e atualizado*. Se o ETS2 estiver aberto, o arquivo fica travado e o app avisa para fechar o jogo.
+
+### De onde vem a DLL
+
+O servidor consulta a última release de [`ets2-plugin`](https://github.com/Lintzz/ets2-plugin/releases/latest) e baixa a `PluginETS2.dll` de lá, guardando em cache no `userData`. Assim o plugin acompanha o repositório do plugin, e não a data em que o instalador do servidor foi gerado — basta publicar uma release nova para todo mundo receber.
+
+O painel mostra a origem em uso (*release vX* ou *a que veio no instalador*) e o botão **Verificar** força uma nova consulta.
+
+Se o GitHub estiver fora do ar, sem internet, ou se o download vier corrompido, o servidor cai para a DLL embutida — a instalação nunca fica bloqueada por causa da rede.
 
 ---
 

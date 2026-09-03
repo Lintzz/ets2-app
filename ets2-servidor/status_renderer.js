@@ -100,6 +100,8 @@ const pluginCaminho = document.getElementById("plugin-caminho");
 const btnEscolher = document.getElementById("plugin-escolher-btn");
 const btnInstalar = document.getElementById("plugin-instalar-btn");
 const btnAbrir = document.getElementById("plugin-abrir-btn");
+const btnVerificar = document.getElementById("plugin-verificar-btn");
+const pluginOrigem = document.getElementById("plugin-origem");
 
 function pintarPlugin(estado) {
   pluginPanel.classList.remove("ok", "pendente", "ausente");
@@ -134,6 +136,22 @@ function pintarPlugin(estado) {
   }
 
   pluginCaminho.textContent = estado.destino || estado.pastaJogo;
+  pintarOrigem(estado);
+}
+
+// De onde vem a DLL que será instalada: a release do GitHub (sempre a mais
+// nova) ou a que veio junto com o instalador, quando não há internet.
+function pintarOrigem(estado) {
+  if (!estado) return;
+
+  if (estado.origem === "release") {
+    pluginOrigem.innerHTML =
+      `DLL: <span class="fonte">release ${estado.tag}</span> do GitHub`;
+  } else {
+    pluginOrigem.innerHTML =
+      `DLL: <span class="fonte">a que veio no instalador</span> — ` +
+      (estado.motivo || "sem acesso ao GitHub");
+  }
 }
 
 async function atualizarPlugin() {
@@ -157,6 +175,17 @@ btnInstalar.addEventListener("click", async () => {
   if (r.ok && !r.jaAtualizado) {
     addLog("Reinicie o Euro Truck Simulator 2 para o novo plugin ser carregado.");
   }
+});
+
+btnVerificar.addEventListener("click", async () => {
+  btnVerificar.disabled = true;
+  pluginOrigem.textContent = "Consultando o GitHub...";
+
+  const estado = await window.servidor.plugin.verificarAtualizacao();
+  pintarPlugin(estado);
+  addLog(`Plugin: ${estado.motivo}`);
+
+  btnVerificar.disabled = false;
 });
 
 btnAbrir.addEventListener("click", () => window.servidor.plugin.abrirPasta());

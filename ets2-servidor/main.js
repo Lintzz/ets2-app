@@ -9,6 +9,7 @@ const {
   instalarPlugin,
   statusInstalacao,
 } = require("./instalador-plugin");
+const { melhorDllDisponivel } = require("./plugin-remoto");
 
 if (require("electron-squirrel-startup")) app.quit();
 
@@ -200,11 +201,26 @@ app.on("before-quit", () => {
 
 // --- INSTALAÇÃO DO PLUGIN NO JOGO ---
 
-// Empacotado, a DLL vai como extraResource; em desenvolvimento fica em recursos/.
-function caminhoDaDll() {
+// DLL que acompanha o instalador. Empacotada vai como extraResource; em
+// desenvolvimento fica em recursos/. Serve de plano B quando não há internet.
+function dllEmbutida() {
   return app.isPackaged
     ? path.join(process.resourcesPath, "PluginETS2.dll")
     : path.join(__dirname, "recursos", "PluginETS2.dll");
+}
+
+const PASTA_CACHE_PLUGIN = () => path.join(app.getPath("userData"), "plugin-cache");
+
+// Resolvida uma vez por execução: a DLL da última release do repositório do
+// plugin, ou a embutida se o GitHub não estiver acessível.
+let dllResolvida = null;
+
+async function caminhoDaDll({ forcarNovaBusca = false } = {}) {
+  if (dllResolvida && !forcarNovaBusca) return dllResolvida;
+
+  dllResolvida = await melhorDllDisponivel(dllEmbutida(), PASTA_CACHE_PLUGIN());
+  sendLogToWindow(`Plugin: ${dllResolvida.motivo}`);
+  return dllResolvida;
 }
 
 const ARQUIVO_CONFIG = () => path.join(app.getPath("userData"), "config.json");
@@ -228,19 +244,30 @@ function salvarConfig(novo) {
 // Pasta em uso: a que o usuário escolheu antes, ou a primeira detectada.
 async function pastaAtualDoJogo() {
   const salva = lerConfig().pastaETS2;
-  if (salva && statusInstalacao(salva, caminhoDaDll()).valida) return salva;
+  if (salva && statusInstalacao(salva, dllEmbutida()).valida) return salva;
 
   const detectadas = await detectarPastasETS2();
   return detectadas[0] || null;
 }
 
-async function estadoDoPlugin() {
-  const pasta = await pastaAtualDoJogo();
-  const detectadas = await detectarPastasETS2();
-  const base = { detectadas, dll: caminhoDaDll() };
+async function estadoDoPlugin(opcoes) {
+  const [pasta, detectadas, dll] = await Promise.all([
+    pastaAtualDoJogo(),
+    detectarPastasETS2(),
+    caminhoDaDll(opcoes),
+  ]);
+
+  const base = {
+    detectadas,
+    dll: dll.caminho,
+    origem: dll.origem,
+    motivo: dll.motivo,
+    tag: dll.release ? dll.release.tag : null,
+    paginaRelease: dll.release ? dll.release.pagina : null,
+  };
 
   if (!pasta) return { ...base, valida: false, pastaJogo: null };
-  return { ...base, ...statusInstalacao(pasta, caminhoDaDll()) };
+  return { ...base, ...statusInstalacao(pasta, dll.caminho) };
 }
 
 // --- HANDLERS IPC ---
@@ -283,7 +310,7 @@ ipcMain.handle("plugin:escolher-pasta", async () => {
   if (escolha.canceled || escolha.filePaths.length === 0) return estadoDoPlugin();
 
   const pasta = escolha.filePaths[0];
-  const status = statusInstalacao(pasta, caminhoDaDll());
+  const status = statusInstalacao(pasta, (await caminhoDaDll()).caminho);
 
   if (!status.valida) {
     sendLogToWindow(
@@ -304,7 +331,8 @@ ipcMain.handle("plugin:instalar", async () => {
     return { ok: false, mensagem: "Escolha primeiro a pasta do Euro Truck Simulator 2." };
   }
 
-  const resultado = instalarPlugin(pasta, caminhoDaDll());
+  const dll = await caminhoDaDll();
+  const resultado = instalarPlugin(pasta, dll.caminho);
   sendLogToWindow(
     resultado.ok
       ? `Plugin: ${resultado.mensagem} (${resultado.destino})`
@@ -312,8 +340,13 @@ ipcMain.handle("plugin:instalar", async () => {
   );
 
   if (resultado.ok) salvarConfig({ pastaETS2: pasta });
-  return { ...resultado, estado: await estadoDoPlugin() };
+  return { ...resultado, origem: dll.origem, tag: dll.release?.tag, estado: await estadoDoPlugin() };
 });
+
+// Reconsulta a release, ignorando o que já foi resolvido nesta execução.
+ipcMain.handle("plugin:verificar-atualizacao", () =>
+  estadoDoPlugin({ forcarNovaBusca: true })
+);
 
 ipcMain.handle("plugin:abrir-pasta", async () => {
   const pasta = await pastaAtualDoJogo();
