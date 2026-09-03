@@ -31,6 +31,9 @@ O que o seu projeto já faz?
 - [x] Leitura de status gerais, motor, transmissão, luzes, danos e navegação.
 - [x] Compartilhamento de dados via Shared Memory (`MeuDashboardETS2_Full`) para comunicação com aplicativos de dashboard (apps externos).
 - [x] Sincronização e resposta rápida e constante, sem afetar o desempenho do simulador.
+- [x] Cabeçalho de versão na memória compartilhada: o servidor recusa a leitura se a DLL carregada no jogo for de outra versão, em vez de exibir dados corrompidos.
+
+> **Ao alterar a struct `TelemetriaCompleta`:** ela é espelhada em `ets2-servidor/leitor_memoria.cpp`. Altere os dois arquivos juntos, incremente `TELEMETRIA_SCHEMA_VERSION` nos dois (e `SCHEMA_ESPERADO` em `ets2-servidor/protocolo.js`), recompile a DLL e o addon.
 
 ---
 
@@ -73,7 +76,7 @@ $ cd ets2-plugin/PluginETS2
 $ start PluginETS2.sln
 ```
 
-1. Dentro do Visual Studio, selecione a configuração **Release** e a arquitetura **x64**.
+1. Dentro do Visual Studio, selecione a configuração **Release** e a arquitetura **x64** (o ETS2 só carrega plugins x64).
 2. Compile o projeto (`Ctrl + Shift + B`).
 3. Pegue a `.dll` gerada na pasta de saída (ex: `x64/Release/PluginETS2.dll`).
 4. Copie a `.dll` para a pasta de plugins do Euro Truck Simulator 2, normalmente em:  

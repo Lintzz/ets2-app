@@ -2,6 +2,11 @@
 #include "scssdk_telemetry.h"
 #include "eurotrucks2/scssdk_telemetry_eut2.h"
 
+// Versao do layout da memoria compartilhada.
+// SEMPRE incremente ao adicionar/remover/reordenar qualquer campo de
+// TelemetriaCompleta, e replique a mudanca em ets2-servidor/leitor_memoria.cpp.
+#define TELEMETRIA_SCHEMA_VERSION 2u
+
 #pragma pack(push, 1)
 
 struct dvector { double x, y, z; };
@@ -9,13 +14,17 @@ struct euler { float heading, pitch, roll; };
 struct dplacement { dvector position; euler orientation; };
 
 struct TelemetriaCompleta {
+    // --- CABECALHO (precisa ser sempre os 2 primeiros campos) ---
+    unsigned int schemaVersion; // == TELEMETRIA_SCHEMA_VERSION
+    unsigned int tamanhoStruct; // == sizeof(TelemetriaCompleta)
+
     // --- GERAL E STATUS ---
     bool jogoRodando;
     bool reboqueConectado;
     float odometro;
     float escalaDoJogo;
 
-    // --- MOTOR E TRANSMISSÃO ---
+    // --- MOTOR E TRANSMISSï¿½O ---
     bool electricoLigado; // *** NOVO CAMPO ***
     bool motorLigado;
     float velocidade;
@@ -64,7 +73,6 @@ struct TelemetriaCompleta {
     float danoRodas;
     float danoReboque;
     float danoCarga;
-    float navProximaCurva;
     float navDistancia;
     float navTempoEstimado;
     float navLimiteVelocidade;
@@ -78,24 +86,39 @@ HANDLE hMapFile;
 TelemetriaCompleta* dadosCompartilhados = nullptr;
 
 // --- Callbacks ---
+// O flag SCS_TELEMETRY_CHANNEL_FLAG_no_value faz o jogo chamar o callback com
+// value == NULL quando o canal fica indisponivel (ex: dano do reboque logo apos
+// desengatar). Nesse caso zeramos o campo, em vez de deixar o valor antigo.
 SCSAPI_VOID callback_generico_float(const scs_string_t, const scs_u32_t, const scs_value_t* const value, const scs_context_t context) {
-    if (dadosCompartilhados && value) { *static_cast<float*>(context) = value->value_float.value; }
+    if (!dadosCompartilhados) return;
+    *static_cast<float*>(context) = value ? value->value_float.value : 0.0f;
 }
 SCSAPI_VOID callback_generico_s32(const scs_string_t, const scs_u32_t, const scs_value_t* const value, const scs_context_t context) {
-    if (dadosCompartilhados && value) { *static_cast<int*>(context) = value->value_s32.value; }
+    if (!dadosCompartilhados) return;
+    *static_cast<int*>(context) = value ? value->value_s32.value : 0;
 }
 SCSAPI_VOID callback_generico_bool(const scs_string_t, const scs_u32_t, const scs_value_t* const value, const scs_context_t context) {
-    if (dadosCompartilhados && value) { *static_cast<bool*>(context) = (value->value_bool.value != 0); }
+    if (!dadosCompartilhados) return;
+    *static_cast<bool*>(context) = value ? (value->value_bool.value != 0) : false;
 }
 SCSAPI_VOID callback_generico_u32(const scs_string_t, const scs_u32_t, const scs_value_t* const value, const scs_context_t context) {
-    if (dadosCompartilhados && value) { *static_cast<unsigned int*>(context) = value->value_u32.value; }
+    if (!dadosCompartilhados) return;
+    *static_cast<unsigned int*>(context) = value ? value->value_u32.value : 0u;
 }
 SCSAPI_VOID callback_generico_dplacement(const scs_string_t, const scs_u32_t, const scs_value_t* const value, const scs_context_t context) {
-    if (dadosCompartilhados && value) {
-        dplacement* destino = static_cast<dplacement*>(context);
-        const scs_value_dplacement_t* origem = &(value->value_dplacement);
-        *destino = *((dplacement*)origem); // Cópia direta
+    if (!dadosCompartilhados) return;
+    dplacement* destino = static_cast<dplacement*>(context);
+    if (!value) {
+        memset(destino, 0, sizeof(dplacement));
+        return;
     }
+    const scs_value_dplacement_t* origem = &(value->value_dplacement);
+    destino->position.x = origem->position.x;
+    destino->position.y = origem->position.y;
+    destino->position.z = origem->position.z;
+    destino->orientation.heading = origem->orientation.heading;
+    destino->orientation.pitch = origem->orientation.pitch;
+    destino->orientation.roll = origem->orientation.roll;
 }
 SCSAPI_VOID callback_pause_play(const scs_event_t event, const void*, const scs_context_t) {
     if (dadosCompartilhados) { dadosCompartilhados->jogoRodando = (event == SCS_TELEMETRY_EVENT_started); }
@@ -114,6 +137,11 @@ SCSAPI_RESULT scs_telemetry_init(const scs_u32_t version, const scs_telemetry_in
         return SCS_RESULT_generic_error;
     }
     memset(dadosCompartilhados, 0, sizeof(TelemetriaCompleta));
+
+    // Cabecalho: o leitor (ets2-servidor) recusa a leitura se isto nao bater
+    // com a versao/tamanho que ele espera, em vez de interpretar lixo.
+    dadosCompartilhados->schemaVersion = TELEMETRIA_SCHEMA_VERSION;
+    dadosCompartilhados->tamanhoStruct = static_cast<unsigned int>(sizeof(TelemetriaCompleta));
 
     version_params->register_for_event(SCS_TELEMETRY_EVENT_paused, callback_pause_play, nullptr);
     version_params->register_for_event(SCS_TELEMETRY_EVENT_started, callback_pause_play, nullptr);
