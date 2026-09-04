@@ -31,7 +31,18 @@
           }
         }
       ],
-      "expo-status-bar",
+      [
+        "expo-status-bar",
+        {
+          "hidden": true
+        }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "hidden": true
+        }
+      ],
       "expo-font",
       [
         "expo-splash-screen",

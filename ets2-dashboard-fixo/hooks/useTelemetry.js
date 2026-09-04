@@ -1,19 +1,26 @@
 // ETS2_DashboardFixo/hooks/useTelemetry.js
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Crypto from "expo-crypto";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { identificar, varrerSubRede } from "./descoberta";
 import {
   BACKOFF_MS,
   CHAVE_DEVICE_ID,
+  CHAVE_SEGREDO,
   CHAVE_ULTIMO_IP,
+  CODIGO_DIGITOS,
+  montarProva,
+  PROTOCOLO_VERSAO,
+  RECUSA,
   TCP_PORT,
   TIMEOUT_IP_CONHECIDO_MS,
 } from "./protocolo";
 
 // Estados possíveis: "iniciando" | "procurando" | "conectando" | "conectado"
-//                    | "recusado" | "sem-servidor"
+//                    | "precisa-codigo" | "recusado" | "sem-servidor"
+//                    | "app-desatualizado"
 const nomeDoAparelho = () => {
   const modelo = Platform.constants?.Model || Platform.constants?.Brand;
   return modelo ? String(modelo) : `Dashboard ${Platform.OS}`;
@@ -22,11 +29,25 @@ const nomeDoAparelho = () => {
 async function obterDeviceId() {
   let id = await AsyncStorage.getItem(CHAVE_DEVICE_ID);
   if (!id) {
-    // Identidade estável deste aparelho, usada pelo pareamento do servidor.
+    // Identidade estável deste aparelho. Sozinha ela não autoriza nada: quem
+    // autoriza é o segredo entregue no pareamento.
     id = `${Platform.OS}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     await AsyncStorage.setItem(CHAVE_DEVICE_ID, id);
   }
   return id;
+}
+
+// Segredo do pareamento com este servidor. Guardado só aqui; nunca é mandado
+// pela rede depois do pareamento — o que viaja é o SHA-256 de nonce:segredo.
+const lerSegredo = () => AsyncStorage.getItem(CHAVE_SEGREDO);
+const guardarSegredo = (s) => AsyncStorage.setItem(CHAVE_SEGREDO, s);
+const apagarSegredo = () => AsyncStorage.removeItem(CHAVE_SEGREDO);
+
+async function calcularProva(nonce, segredo) {
+  return Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    montarProva(nonce, segredo)
+  );
 }
 
 export function useTelemetry() {
@@ -34,6 +55,7 @@ export function useTelemetry() {
   const [telemetry, setTelemetry] = useState(null);
   const [servidor, setServidor] = useState(null);
   const [progresso, setProgresso] = useState(null);
+  const [erroPareamento, setErroPareamento] = useState(null);
 
   // Tudo que não precisa redesenhar a tela vive em ref: a versão anterior
   // guardava o WebSocket em estado e o próprio efeito o alterava, o que fazia
@@ -45,6 +67,7 @@ export function useTelemetry() {
   const buscaRef = useRef(null);
   const desmontadoRef = useRef(false);
   const estadoRef = useRef("iniciando");
+  const codigoRef = useRef(null); // código digitado, gasto no próximo hello
 
   // setEstado + espelho em ref: o onclose precisa saber o estado atual sem
   // executar efeito colateral dentro de um updater do React.
@@ -84,17 +107,11 @@ export function useTelemetry() {
     const ws = new WebSocket(`ws://${alvo.ip}:${alvo.port || TCP_PORT}`);
     wsRef.current = ws;
 
-    ws.onopen = () => {
-      ws.send(
-        JSON.stringify({
-          type: "hello",
-          deviceId: deviceIdRef.current,
-          nome: nomeDoAparelho(),
-        })
-      );
-    };
+    // O servidor fala primeiro, mandando um nonce. Só então dá para montar o
+    // hello: com a prova (se já pareado) ou com o código que o usuário digitou.
+    ws.onopen = () => {};
 
-    ws.onmessage = (evento) => {
+    ws.onmessage = async (evento) => {
       let dados;
       try {
         dados = JSON.parse(evento.data);
@@ -103,14 +120,71 @@ export function useTelemetry() {
       }
 
       // Handshake
+      if (dados && dados.type === "challenge") {
+        const hello = {
+          type: "hello",
+          protocolo: PROTOCOLO_VERSAO,
+          deviceId: deviceIdRef.current,
+          nome: nomeDoAparelho(),
+        };
+
+        const segredo = await lerSegredo();
+
+        if (segredo) {
+          hello.prova = await calcularProva(dados.nonce, segredo);
+        } else if (codigoRef.current) {
+          hello.codigo = codigoRef.current;
+          codigoRef.current = null; // uso único, como no servidor
+        } else if (!dados.pareado) {
+          // Servidor sem dono e nós sem código: parar aqui e pedir ao usuário.
+          mudarEstado("precisa-codigo");
+          return;
+        }
+
+        if (wsRef.current === ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(hello));
+        }
+        return;
+      }
+
       if (dados && dados.type === "welcome") {
+        // O segredo vem uma única vez, no pareamento.
+        if (dados.segredo) {
+          try {
+            await guardarSegredo(dados.segredo);
+          } catch {
+            /* sem storage: pareia de novo na próxima abertura */
+          }
+        }
         tentativaRef.current = 0;
+        setErroPareamento(null);
         mudarEstado("conectado");
         AsyncStorage.setItem(CHAVE_ULTIMO_IP, JSON.stringify(alvo)).catch(() => {});
         return;
       }
+
       if (dados && dados.type === "denied") {
-        mudarEstado("recusado");
+        // O segredo guardado não vale mais (o PC esqueceu o aparelho, ou outro
+        // aparelho assumiu): jogar fora e voltar a pedir o código.
+        if (
+          dados.reason === RECUSA.PROVA_INVALIDA ||
+          dados.reason === RECUSA.PRECISA_CODIGO
+        ) {
+          try {
+            await apagarSegredo();
+          } catch {
+            /* ignora */
+          }
+        }
+
+        setErroPareamento(dados.reason || "recusado");
+        mudarEstado(
+          dados.reason === RECUSA.PROTOCOLO
+            ? "app-desatualizado"
+            : dados.reason === RECUSA.JA_PAREADO
+              ? "recusado"
+              : "precisa-codigo"
+        );
         fecharSocket();
         return;
       }
@@ -127,9 +201,16 @@ export function useTelemetry() {
       wsRef.current = null;
       setTelemetry(null);
 
-      // "recusado" é decisão do servidor: reconectar em loop não adianta,
-      // o usuário precisa liberar o pareamento no PC.
-      if (estadoRef.current === "recusado") return;
+      // Estes três dependem de uma ação do usuário — reconectar em laço não
+      // adianta: liberar o pareamento no PC, digitar o código, ou atualizar
+      // o aplicativo.
+      if (
+        estadoRef.current === "recusado" ||
+        estadoRef.current === "precisa-codigo" ||
+        estadoRef.current === "app-desatualizado"
+      ) {
+        return;
+      }
       mudarEstado("procurando");
       agendarNovaBusca();
     };
@@ -241,6 +322,38 @@ export function useTelemetry() {
     procurar();
   }, [procurar]);
 
+  // Envia o código que o usuário leu na janela do servidor. Guarda em ref e
+  // reabre a conexão: o código é gasto na resposta ao próximo challenge.
+  const parearComCodigo = useCallback(
+    (codigo) => {
+      const limpo = String(codigo || "").replace(/\D/g, "");
+      if (limpo.length !== CODIGO_DIGITOS) return false;
+
+      codigoRef.current = limpo;
+      setErroPareamento(null);
+      tentativaRef.current = 0;
+      limparTimer();
+
+      // servidor já é conhecido quando chegamos em "precisa-codigo"
+      if (servidor) conectar(servidor);
+      else procurar();
+
+      return true;
+    },
+    [conectar, procurar, servidor]
+  );
+
+  // Desfaz o pareamento deste lado (o do PC sai em "Esquecer aparelho").
+  const esquecerPareamento = useCallback(async () => {
+    try {
+      await apagarSegredo();
+    } catch {
+      /* ignora */
+    }
+    setErroPareamento(null);
+    procurarNovamente();
+  }, [procurarNovamente]);
+
   const enviarComando = useCallback((type, payload) => {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -258,10 +371,13 @@ export function useTelemetry() {
     telemetry,
     servidor,
     progresso,
+    erroPareamento,
     pressKey,
     holdKeyDown,
     holdKeyUp,
     conectarManual,
     procurarNovamente,
+    parearComCodigo,
+    esquecerPareamento,
   };
 }

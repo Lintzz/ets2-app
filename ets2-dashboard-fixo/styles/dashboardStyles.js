@@ -1,4 +1,4 @@
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 
 const colors = {
   background: "#0F1014",
@@ -51,6 +51,26 @@ export default StyleSheet.create({
   displayValue: { color: colors.font, fontSize: 18, fontWeight: "bold" },
   displayLabel: { color: colors.fontSecondary, fontSize: 10 },
   gridContainer: { flex: 1 },
+
+  // Faixa discreta no topo enquanto o jogo está no menu/pausado. pointerEvents
+  // é "none" no componente, senão ela roubaria o toque dos widgets embaixo.
+  avisoMenu: {
+    position: "absolute",
+    top: 6,
+    alignSelf: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(30, 32, 39, 0.92)",
+    borderWidth: 1,
+    borderColor: "#333",
+  },
+  avisoMenuTexto: {
+    color: colors.fontSecondary,
+    fontSize: 10,
+    fontWeight: "bold",
+    letterSpacing: 1,
+  },
   widgetWrapper: { position: "absolute", padding: 2 },
   widgetContainer: {
     width: "100%",
@@ -89,6 +109,15 @@ export default StyleSheet.create({
     minWidth: 180,
     borderWidth: 1,
     borderColor: "#2E313A",
+  },
+  // O código de pareamento é lido dígito a dígito da tela do PC: fonte grande,
+  // monoespaçada e espaçada, para não confundir 0/O e 1/l na conferência.
+  codigoInput: {
+    fontSize: 30,
+    letterSpacing: 10,
+    textAlign: "center",
+    fontFamily: Platform.select({ android: "monospace", ios: "Menlo" }),
+    minWidth: 220,
   },
   conexaoBotao: {
     backgroundColor: colors.accent,

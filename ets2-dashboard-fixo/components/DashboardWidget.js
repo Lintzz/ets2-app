@@ -8,12 +8,15 @@ import styles from "../styles/dashboardStyles";
 import AlertIndicator from "./custom/AlertIndicator";
 import FuelGaugeWidget from "./custom/FuelGaugeWidget";
 
-const WidgetContent = ({ config, telemetry, isBeingPressed }) => {
+// aoVivo === false: o jogo está no menu/pausado. O painel continua na tela e os
+// botões continuam funcionando (é o único jeito de mandar ESC de volta para o
+// jogo), mas os mostradores exibem "--" em vez de valores velhos ou zerados,
+// para não parecer telemetria de verdade.
+const WidgetContent = ({ config, telemetry, isBeingPressed, aoVivo }) => {
   const { type, options } = config;
 
-  const isTelemetryActive = options.isActiveCheck
-    ? options.isActiveCheck(telemetry)
-    : false;
+  const isTelemetryActive =
+    aoVivo && options.isActiveCheck ? options.isActiveCheck(telemetry) : false;
 
   const isEffectivelyActive = isTelemetryActive || isBeingPressed;
 
@@ -79,7 +82,9 @@ const WidgetContent = ({ config, telemetry, isBeingPressed }) => {
       );
     case "DataDisplay":
       const displayValue =
-        typeof options.value === "function" ? options.value(telemetry) : "--";
+        aoVivo && typeof options.value === "function"
+          ? options.value(telemetry)
+          : "--";
       return (
         <View style={styles.display}>
           <Text style={styles.displayLabel}>{options.label}</Text>
@@ -87,7 +92,9 @@ const WidgetContent = ({ config, telemetry, isBeingPressed }) => {
         </View>
       );
     case "FuelGauge":
-      return <FuelGaugeWidget telemetry={telemetry} options={options} />;
+      return (
+        <FuelGaugeWidget telemetry={telemetry} options={options} aoVivo={aoVivo} />
+      );
     case "Alert":
       return <AlertIndicator telemetry={telemetry} options={options} />;
     default:
@@ -101,6 +108,7 @@ const DashboardWidget = ({
   pressKey,
   holdKeyDown,
   holdKeyUp,
+  aoVivo = true,
 }) => {
   const [isBeingPressed, setIsBeingPressed] = useState(false);
   const panGesture = Gesture.Pan().enabled(false); // Gesto de arrastar desativado
@@ -140,6 +148,7 @@ const DashboardWidget = ({
             config={config}
             telemetry={telemetry}
             isBeingPressed={isBeingPressed}
+            aoVivo={aoVivo}
           />
           {showLabel &&
             !!config.options.label &&

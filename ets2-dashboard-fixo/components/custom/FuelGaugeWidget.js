@@ -1,14 +1,13 @@
 import { StyleSheet, Text, View } from "react-native";
 
-const FuelGaugeWidget = ({ telemetry, options }) => {
-  const fuelPercentage =
-    (telemetry.combustivel / telemetry.capacidadeCombustivel) * 100;
+const FuelGaugeWidget = ({ telemetry, options, aoVivo = true }) => {
+  const litros = telemetry?.combustivel;
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{options.label || "COMBUSTÍVEL"}</Text>
       <Text style={styles.valueText}>
-        {`${Math.round(telemetry.combustivel)} L`}
+        {aoVivo && typeof litros === "number" ? `${Math.round(litros)} L` : "--"}
       </Text>
     </View>
   );

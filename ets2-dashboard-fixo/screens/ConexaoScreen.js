@@ -14,7 +14,7 @@ import {
   View,
 } from "react-native";
 import styles from "../styles/dashboardStyles";
-import { TCP_PORT } from "../hooks/protocolo";
+import { CODIGO_DIGITOS, RECUSA, TCP_PORT } from "../hooks/protocolo";
 
 const MENSAGENS = {
   iniciando: "Iniciando...",
@@ -22,7 +22,23 @@ const MENSAGENS = {
   conectando: "Conectando ao servidor...",
   conectado: "Conectado. Aguardando o jogo...",
   "sem-servidor": "Servidor não encontrado nesta rede.",
+  "precisa-codigo": "Parear com o PC",
   recusado: "Recusado: já existe outro aparelho pareado.",
+  "app-desatualizado": "Este aplicativo está desatualizado.",
+};
+
+// Explicação de cada motivo de recusa mandado pelo servidor.
+const MOTIVOS = {
+  [RECUSA.PRECISA_CODIGO]:
+    "Digite o código de 6 dígitos que aparece na janela do servidor, no PC.",
+  [RECUSA.CODIGO_INVALIDO]:
+    "Código errado ou vencido. Gere um novo na janela do servidor e tente de novo.",
+  [RECUSA.PROVA_INVALIDA]:
+    "O pareamento anterior não vale mais. Digite o código mostrado no PC.",
+  [RECUSA.JA_PAREADO]:
+    'Outro aparelho já está pareado. No PC, clique em "Esquecer aparelho" para trocar.',
+  [RECUSA.PROTOCOLO]:
+    "O servidor no PC é mais novo que este aplicativo. Instale a versão nova do app.",
 };
 
 const IP_VALIDO = /^(\d{1,3}\.){3}\d{1,3}$/;
@@ -31,14 +47,27 @@ export default function ConexaoScreen({
   estado,
   servidor,
   progresso,
+  erroPareamento,
   conectarManual,
   procurarNovamente,
+  parearComCodigo,
 }) {
   const [ip, setIp] = useState("");
+  const [codigo, setCodigo] = useState("");
   const [erro, setErro] = useState(null);
   const [tentando, setTentando] = useState(false);
 
   const ocupado = estado === "procurando" || estado === "conectando" || tentando;
+  const pedindoCodigo = estado === "precisa-codigo";
+
+  const enviarCodigo = () => {
+    if (!parearComCodigo(codigo)) {
+      setErro(`O código tem ${CODIGO_DIGITOS} dígitos.`);
+      return;
+    }
+    setErro(null);
+    setCodigo("");
+  };
 
   const tentarManual = async () => {
     const alvo = ip.trim();
@@ -73,11 +102,42 @@ export default function ConexaoScreen({
         </Text>
       )}
 
-      {estado === "recusado" && (
-        <Text style={styles.conexaoSubtexto}>
-          Na janela do servidor no PC, clique em "Esquecer aparelho" para parear
-          este aqui.
-        </Text>
+      {erroPareamento && MOTIVOS[erroPareamento] && (
+        <Text style={styles.conexaoSubtexto}>{MOTIVOS[erroPareamento]}</Text>
+      )}
+
+      {pedindoCodigo && !erroPareamento && (
+        <Text style={styles.conexaoSubtexto}>{MOTIVOS[RECUSA.PRECISA_CODIGO]}</Text>
+      )}
+
+      {pedindoCodigo && (
+        <View style={styles.conexaoManual}>
+          <View style={styles.conexaoLinha}>
+            <TextInput
+              style={[styles.conexaoInput, styles.codigoInput]}
+              value={codigo}
+              onChangeText={(t) => setCodigo(t.replace(/\D/g, "").slice(0, CODIGO_DIGITOS))}
+              placeholder="000000"
+              placeholderTextColor="#8A8A8E"
+              keyboardType="number-pad"
+              maxLength={CODIGO_DIGITOS}
+              autoFocus
+              autoCorrect={false}
+            />
+            <Pressable
+              style={[
+                styles.conexaoBotao,
+                codigo.length !== CODIGO_DIGITOS && styles.conexaoBotaoInativo,
+              ]}
+              onPress={enviarCodigo}
+              disabled={codigo.length !== CODIGO_DIGITOS}
+            >
+              <Text style={styles.conexaoBotaoTexto}>Parear</Text>
+            </Pressable>
+          </View>
+
+          {erro && <Text style={styles.conexaoErro}>{erro}</Text>}
+        </View>
       )}
 
       {(estado === "sem-servidor" || estado === "recusado") && (

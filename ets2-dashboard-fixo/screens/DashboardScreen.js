@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import ConexaoScreen from "./ConexaoScreen";
 import DashboardWidget from "../components/DashboardWidget";
 import { useTelemetry } from "../hooks/useTelemetry";
@@ -859,30 +859,39 @@ export default function DashboardScreen() {
     telemetry,
     servidor,
     progresso,
+    erroPareamento,
     pressKey,
     holdKeyDown,
     holdKeyUp,
     conectarManual,
     procurarNovamente,
+    parearComCodigo,
   } = useTelemetry();
 
   useEffect(() => {
     setWidgets(rehydrateLayout(INITIAL_WIDGETS));
   }, []);
 
-  // telemetry vem null com o jogo fechado e { jogoRodando:false, inMenu:true }
-  // no menu; nos dois casos ainda não há o que desenhar no painel.
-  if (!telemetry || telemetry.jogoRodando === false) {
+  // telemetry vem null com o jogo fechado ou sem servidor — aí não há painel a
+  // mostrar. Já { jogoRodando:false, inMenu:true } é o jogo no menu ou pausado:
+  // antes isso também caía na ConexaoScreen, e o painel sumia justo quando o
+  // botão de ESC era o que faltava para voltar ao jogo. Agora o painel fica na
+  // tela, com os botões vivos e os mostradores em "--".
+  if (!telemetry) {
     return (
       <ConexaoScreen
         estado={estado}
         servidor={servidor}
         progresso={progresso}
+        erroPareamento={erroPareamento}
         conectarManual={conectarManual}
         procurarNovamente={procurarNovamente}
+        parearComCodigo={parearComCodigo}
       />
     );
   }
+
+  const aoVivo = telemetry.jogoRodando !== false;
 
   return (
     <View style={styles.container}>
@@ -908,12 +917,21 @@ export default function DashboardScreen() {
               pressKey={pressKey}
               holdKeyDown={holdKeyDown}
               holdKeyUp={holdKeyUp}
+              aoVivo={aoVivo}
             />
           </View>
         ))}
         {/* Adicione o componente de grade aqui
         <GridOverlay /> */}
       </View>
+
+      {!aoVivo && (
+        <View style={styles.avisoMenu} pointerEvents="none">
+          <Text style={styles.avisoMenuTexto}>
+            JOGO NO MENU · botões ativos, dados pausados
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
