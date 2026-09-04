@@ -55,8 +55,6 @@ Euro Truck Simulator 2
 Nada sai do seu PC. A telemetria vai direto para o tablet, dentro da sua rede.
 O único acesso à internet é para procurar versão nova do plugin e do servidor.
 
-**Site oficial:** [ets2-landing-page.vercel.app](https://ets2-landing-page.vercel.app/)
-
 ---
 
 ## :inbox_tray: Instalação
