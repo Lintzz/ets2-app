@@ -1,32 +1,32 @@
-# :rocket: ETS2 Telemetry Plugin
+# :electric_plug: ETS2 Telemetry Plugin
 
-<p align="center">
-  <img src="https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white" alt="C++" />
-  <img src="https://img.shields.io/badge/Visual_Studio-5C2D91?style=for-the-badge&logo=visual%20studio&logoColor=white" alt="Visual Studio" />
-  <img src="https://img.shields.io/badge/SCS_SDK-FFB900?style=for-the-badge&logo=scs&logoColor=white" alt="SCS SDK" />
-</p>
+> DLL em C++ carregada pelo Euro Truck Simulator 2. Registra os canais de
+> telemetria do SCS SDK 1.14 e escreve tudo numa região de memória compartilhada
+> do Windows.
 
-> Um plugin poderoso para Euro Truck Simulator 2 que extrai dados completos de telemetria em tempo real e os compartilha em memória para uso em dashboards externos. Vá direto ao ponto!
+Parte do **[ETS2 Dashboard](../README.md)** — comece por lá para entender o
+conjunto e instalar. Este arquivo cobre só o que é desta pasta.
 
 ## :clipboard: Tabela de Conteúdos
-- [Sobre](#-sobre)
-- [Features](#-features)
-- [Tecnologias Utilizadas](#-tecnologias-utilizadas)
-- [Como Rodar](#-como-rodar)
-- [Licença](#-licença)
-- [Contato](#-contato)
+- [Como este projeto se encaixa](#-como-este-projeto-se-encaixa)
+- [O que ele faz](#-o-que-ele-faz)
+- [Como compilar](#-como-compilar)
 
 ---
 
-## :book: Sobre
-Este projeto consiste em um plugin desenvolvido em C++ para o Euro Truck Simulator 2 utilizando o SCS SDK 1.14. O principal objetivo é acessar os dados da telemetria do jogo (como velocidade, RPM, marchas, luzes, desgaste de peças e informações de navegação) e exportá-los através de memória compartilhada (Shared Memory) sob o nome `MeuDashboardETS2_Full`. Com ele, é possível automatizar ou criar interfaces de painel customizadas, extraindo de forma eficiente o que o jogo processa em tempo real.
+## :jigsaw: Como este projeto se encaixa
 
-![Screenshot do app](https://via.placeholder.com/800x400?text=ETS2+Telemetry+Plugin)
+É a origem de todo o dado. O jogo carrega esta DLL, ela recebe os callbacks do
+SDK e escreve numa memória compartilhada que o
+[servidor](../ets2-servidor) lê do outro lado.
+
+A struct gravada aqui é **duplicada** em `ets2-servidor/leitor_memoria.cpp`, com
+um número de versão nos dois lados. Mexeu numa, mexa na outra e suba a versão —
+senão o servidor recusa a telemetria e avisa "plugin desatualizado".
 
 ---
 
-## :sparkles: Features
-O que o seu projeto já faz? 
+## :sparkles: O que ele faz
 - [x] Extração completa de dados de telemetria em tempo real do ETS2.
 - [x] Leitura de status gerais, motor, transmissão, luzes, danos e navegação.
 - [x] Compartilhamento de dados via Shared Memory (`MeuDashboardETS2_Full`) para comunicação com aplicativos de dashboard (apps externos).
@@ -37,33 +37,12 @@ O que o seu projeto já faz?
 
 ---
 
-## :globe_with_meridians: Site Oficial & Como Funciona
-Acesse o nosso site oficial para mais informações, downloads e guias rápidos: 
-**[https://ets2-landing-page.vercel.app/](https://ets2-landing-page.vercel.app/)**
-
-### 🔄 Como o ecossistema funciona?
-O projeto é composto por 3 partes principais que trabalham em conjunto para trazer a telemetria do jogo para suas mãos:
-1. **[Plugin (C++)](https://github.com/Lintzz/ets2-app/tree/main/ets2-plugin)**: Roda diretamente dentro do Euro Truck Simulator 2, lendo os dados de telemetria em tempo real e os disponibiliza na memória do PC (Shared Memory).
-2. **[Servidor (Node.js/Electron)](https://github.com/Lintzz/ets2-app/tree/main/ets2-servidor)**: Roda no seu PC, lendo os dados disponibilizados pelo Plugin na memória. Ele cria um servidor WebSocket local e os transmite para a rede.
-3. **[Dashboard (App Mobile/Web)](https://github.com/Lintzz/ets2-app/tree/main/ets2-dashboard-fixo)**: O seu dispositivo (celular/tablet) se conecta ao Servidor através do Wi-Fi (via WebSocket) para exibir todas as informações (velocidade, RPM, combustível, etc.) e pode enviar comandos de volta para o jogo.
-
----
-
-## :computer: Tecnologias Utilizadas
-As principais ferramentas, linguagens e bibliotecas usadas na construção do projeto:
-- [C++](https://cplusplus.com/)
-- [SCS SDK (1.14)](https://modding.scssoft.com/wiki/Documentation/Engine/SDK/Telemetry)
-- [Visual Studio IDE](https://visualstudio.microsoft.com/)
-- API do Windows (Memória Compartilhada)
-
----
-
-## :rocket: Como Rodar
+## :rocket: Como compilar
 
 ### Pré-requisitos
 Antes de começar, você vai precisar ter instalado na sua máquina o [Git](https://git-scm.com/) e o [Visual Studio](https://visualstudio.microsoft.com/) com a carga de trabalho de desenvolvimento para Desktop em C++.
 
-### Instalação e Execução
+### Compilando e instalando no jogo
 
 ```bash
 # Clone este repositório

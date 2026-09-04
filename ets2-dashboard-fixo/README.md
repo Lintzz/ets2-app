@@ -1,59 +1,37 @@
-# :rocket: ETS2 Dashboard Fixo
+# :bar_chart: ETS2 Dashboard Fixo
 
-<p align="center">
-  <img src="https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React Native" />
-  <img src="https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white" alt="Expo" />
-  <img src="https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js" />
-</p>
+> Aplicativo Expo / React Native que transforma um tablet Android no painel do
+> caminhão: telemetria a 20 Hz e botões que acionam os comandos do jogo.
 
-> Dashboard Fixo para Euro Truck Simulator 2, permitindo visualização de telemetria e widgets customizados. Vá direto ao ponto e tenha seus dados na tela!
+Parte do **[ETS2 Dashboard](../README.md)** — comece por lá para entender o
+conjunto, instalar e parear. Este arquivo cobre só o que é desta pasta.
 
 ## :clipboard: Tabela de Conteúdos
-- [Sobre](#-sobre)
-- [Features](#-features)
-- [Tecnologias Utilizadas](#-tecnologias-utilizadas)
-- [Como Rodar](#-como-rodar)
-- [Licença](#-licença)
-- [Contato](#-contato)
+- [Como este projeto se encaixa](#-como-este-projeto-se-encaixa)
+- [O que ele faz](#-o-que-ele-faz)
+- [Como rodar](#-como-rodar)
+- [Gerando o APK localmente](#gerando-o-apk-localmente)
 
 ---
 
-## :book: Sobre
-Este projeto é um Dashboard customizado criado para rodar integrado ao Euro Truck Simulator 2. O objetivo é fornecer informações e telemetria essenciais do jogo em tempo real (via WebSocket) de forma acessível e com uma interface moderna, facilitando a experiência dos motoristas. 
+## :jigsaw: Como este projeto se encaixa
 
-Seja para automatizar a leitura de dados ou aprimorar sua simulação, o ETS2 Dashboard Fixo foi feito para entregar valor.
+É a ponta visível. Acha o [servidor](../ets2-servidor) sozinho varrendo a própria
+sub-rede, conecta por WebSocket e desenha o painel com o que chega — mandando de
+volta o que você aperta.
+
+O `hooks/protocolo.js` é **espelho** de `ets2-servidor/protocolo.js`. Mudou um
+lado, mude o outro.
 
 ---
 
-## :sparkles: Features
-O que o seu projeto já faz? 
+## :sparkles: O que ele faz
 - [x] Dashboard interativo e em tempo real para o ETS2
 - [x] Conexão direta com dados de telemetria (WebSocket, ~20 Hz)
 - [x] Descoberta automática do servidor pelo Wi-Fi, varrendo a própria sub-rede — sem precisar de cabo nem digitar IP
 - [x] Entrada manual de IP como alternativa, para redes onde a varredura não alcança
 - [x] Biblioteca de Widgets customizáveis
 - [x] Renderização avançada e dinâmica de ícones em SVG
-
----
-
-## :globe_with_meridians: Site Oficial & Como Funciona
-Acesse o nosso site oficial para mais informações, downloads e guias rápidos: 
-**[https://ets2-landing-page.vercel.app/](https://ets2-landing-page.vercel.app/)**
-
-### 🔄 Como o ecossistema funciona?
-O projeto é composto por 3 partes principais que trabalham em conjunto para trazer a telemetria do jogo para suas mãos:
-1. **[Plugin (C++)](https://github.com/Lintzz/ets2-app/tree/main/ets2-plugin)**: Roda diretamente dentro do Euro Truck Simulator 2, lendo os dados de telemetria em tempo real e os disponibiliza na memória do PC (Shared Memory).
-2. **[Servidor (Node.js/Electron)](https://github.com/Lintzz/ets2-app/tree/main/ets2-servidor)**: Roda no seu PC, lendo os dados disponibilizados pelo Plugin na memória. Ele cria um servidor WebSocket local e os transmite para a rede.
-3. **[Dashboard (App Mobile/Web)](https://github.com/Lintzz/ets2-app/tree/main/ets2-dashboard-fixo)**: O seu dispositivo (celular/tablet) se conecta ao Servidor através do Wi-Fi (via WebSocket) para exibir todas as informações (velocidade, RPM, combustível, etc.) e pode enviar comandos de volta para o jogo.
-
----
-
-## :computer: Tecnologias Utilizadas
-As principais ferramentas, linguagens e bibliotecas usadas na construção do projeto:
-- [React Native](https://reactnative.dev/)
-- [Expo](https://expo.dev/)
-- [Socket.io](https://socket.io/)
-- [React Native SVG](https://github.com/software-mansion/react-native-svg)
 
 ---
 
@@ -103,10 +81,9 @@ $ JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleRele
 O APK sai em `android/app/build/outputs/apk/release/app-release.apk`. Ele e assinado com a chave de debug (padrao do template do Expo): instala por sideload normalmente, mas nao serve para a Play Store — para isso, gere um keystore proprio e ajuste o `signingConfig` de `release`.
 
 ### Conectando ao servidor
-1. Abra o **ETS2 Servidor** no PC e confira o IP mostrado na janela.
-2. Ponha o tablet e o PC na **mesma rede** (Wi-Fi de casa serve; não precisa de cabo).
-3. Abra o app — ele encontra o servidor sozinho em alguns segundos e memoriza o endereço para as próximas vezes.
-4. Se não encontrar, digite o IP do PC na própria tela de conexão.
+
+O passo a passo — descoberta na rede, código de pareamento e o que fazer quando
+não conecta — está no [README da raiz](../README.md#-parear-o-tablet).
 
 ---
 
