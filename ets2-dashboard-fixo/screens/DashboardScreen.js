@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Text, View, useWindowDimensions } from "react-native";
 import ConexaoScreen from "./ConexaoScreen";
 import DashboardWidget from "../components/DashboardWidget";
 import { useTelemetry } from "../hooks/useTelemetry";
@@ -872,6 +872,43 @@ export default function DashboardScreen() {
     setWidgets(rehydrateLayout(INITIAL_WIDGETS));
   }, []);
 
+  // O grid é desenhado a partir de (0,0): "left: x * GRID_CELL_SIZE" e mais
+  // nada. Como a primeira coluna e a primeira linha ocupadas são a 1, sobrava
+  // uma folga fixa de uma célula à esquerda e no topo, e todo o resto da tela
+  // caía à direita e embaixo — os lados ficavam visivelmente desiguais. Aqui os
+  // limites reais do layout são medidos e o bloco inteiro é deslocado para
+  // centralizar. Nenhum widget muda de tamanho; só a posição do conjunto.
+  const limites = useMemo(() => {
+    if (!widgets.length) return null;
+    const minX = Math.min(...widgets.map((w) => w.x));
+    const minY = Math.min(...widgets.map((w) => w.y));
+    const maxX = Math.max(...widgets.map((w) => w.x + w.w));
+    const maxY = Math.max(...widgets.map((w) => w.y + w.h));
+    return {
+      minX,
+      minY,
+      largura: (maxX - minX) * GRID_CELL_SIZE,
+      altura: (maxY - minY) * GRID_CELL_SIZE,
+    };
+  }, [widgets]);
+
+  // useWindowDimensions em vez de Dimensions.get: reage a rotação e a mudanças
+  // de tamanho da janela sem precisar de listener.
+  const { width: larguraTela, height: alturaTela } = useWindowDimensions();
+  const deslocamento = useMemo(() => {
+    if (!limites) return { x: 0, y: 0 };
+    // O Math.max(0, ...) é a guarda para uma tela menor que o grid: em vez de
+    // cortar dos dois lados, o conteúdo encosta na borda como antes.
+    return {
+      x:
+        Math.max(0, (larguraTela - limites.largura) / 2) -
+        limites.minX * GRID_CELL_SIZE,
+      y:
+        Math.max(0, (alturaTela - limites.altura) / 2) -
+        limites.minY * GRID_CELL_SIZE,
+    };
+  }, [limites, larguraTela, alturaTela]);
+
   // telemetry vem null com o jogo fechado ou sem servidor — aí não há painel a
   // mostrar. Já { jogoRodando:false, inMenu:true } é o jogo no menu ou pausado:
   // antes isso também caía na ConexaoScreen, e o painel sumia justo quando o
@@ -896,7 +933,17 @@ export default function DashboardScreen() {
   return (
     <View style={styles.container}>
       <StatusBar hidden />
-      <View style={styles.gridContainer}>
+      <View
+        style={[
+          styles.gridContainer,
+          {
+            transform: [
+              { translateX: deslocamento.x },
+              { translateY: deslocamento.y },
+            ],
+          },
+        ]}
+      >
         {widgets.map((widget, index) => (
           <View
             key={widget.id}
