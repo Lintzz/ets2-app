@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+    />
+    <title>ETS2 Dashboard Server Status</title>
+    <!--
+      Tudo é local de propósito: a versão anterior carregava o Tailwind por CDN,
+      e o app abria sem nenhum estilo quando o PC estava sem internet — que é
+      justamente o cenário de quem só liga o PC para jogar. Pelo mesmo motivo as
+      fontes do design vêm embutidas em fontes/fontes.css, não do Google.
+    -->
+    <link rel="stylesheet" href="fontes/fontes.css" />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #07090a;
+        --painel: #0c0f11;
+        --painel-2: #0f1416;
+        --borda: #1c2427;
+        --borda-sutil: #151b1e;
+        --texto: #e6ecea;
+        --muted: #8d9c98;
+        --muted-2: #5f6e6a;
+        --mono-dim: #48544f;
+
+        --verde: oklch(0.82 0.19 145);
+        --verde-forte: oklch(0.85 0.2 145);
+        --azul: oklch(0.75 0.13 220);
+        --ambar: oklch(0.85 0.15 85);
+        --vermelho: oklch(0.7 0.2 25);
+
+        --fonte: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+        --mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+
+        /* Cor do estado atual do servidor. status_renderer.js sobrescreve. */
+        --cor-status: var(--muted-2);
+      }
+
+      @keyframes pulseDot {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.35;
+          transform: scale(0.8);
+        }
+      }
+
+      @keyframes sweep {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(300%);
+        }
+      }
+
+      body {
+        font-family: var(--fonte);
+        background: linear-gradient(180deg, var(--painel) 0%, #080a0b 100%);
+        color: var(--texto);
+        height: 100vh;
+        overflow: hidden;
+        font-size: 14px;
+        display: grid;
+        grid-template-rows: 44px 1fr 30px;
+        position: relative;
+      }
+
+      /* Brilho de fundo do design; não pode capturar cliques. */
+      body::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+            900px 380px at 12% -10%,
+            oklch(0.62 0.16 145 / 0.13),
+            transparent 70%
+          ),
+          radial-gradient(700px 300px at 100% 110%, oklch(0.6 0.12 200 / 0.08), transparent 70%);
+      }
+
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0b0e10;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #20282a;
+        border: 2px solid #0b0e10;
+        border-radius: 6px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: oklch(0.55 0.13 145);
+      }
+
+      .rotulo {
+        font-size: 10.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted-2);
+        font-weight: 600;
+      }
+
+      /* --- Barra de título (a janela é frameless) --- */
+
+      header {
+        -webkit-app-region: drag;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 6px 0 16px;
+        border-bottom: 1px solid #171d20;
+        background: rgba(10, 13, 14, 0.9);
+        position: relative;
+        z-index: 2;
+      }
+
+      .titulo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .marca {
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        background: linear-gradient(135deg, oklch(0.8 0.2 145), oklch(0.55 0.16 155));
+        box-shadow: 0 0 14px oklch(0.75 0.2 145 / 0.5);
+        flex-shrink: 0;
+      }
+
+      .titulo .nome {
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #cfd8d5;
+        white-space: nowrap;
+      }
+
+      #app-versao {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted-2);
+        letter-spacing: 0.06em;
+        padding: 2px 6px;
+        border: 1px solid #1e262a;
+        border-radius: 4px;
+      }
+
+      .controles {
+        display: flex;
+        gap: 2px;
+      }
+
+      .window-control {
+        -webkit-app-region: no-drag;
+        width: 38px;
+        height: 32px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: #7b8a86;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s, color 0.15s;
+      }
+      .window-control:hover {
+        background: #161c1f;
+        color: var(--texto);
+      }
+      #close-btn:hover {
+        background: oklch(0.5 0.2 25);
+        color: #fff;
+      }
+
+      /* --- Corpo --- */
+
+      main {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        min-height: 0;
+        position: relative;
+        z-index: 1;
+      }
+
+      .lateral {
+        border-right: 1px solid var(--borda-sutil);
+        padding: 18px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: rgba(8, 11, 12, 0.6);
+        min-height: 0;
+        overflow-y: auto;
+      }
+
+      .conteudo {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 16px;
+        padding: 18px 20px;
+        min-height: 0;
+        min-width: 0;
+      }
+
+      .cartao {
+        border: 1px solid var(--borda);
+        border-radius: 10px;
+        background: linear-gradient(160deg, rgba(18, 24, 26, 0.85), rgba(10, 13, 14, 0.85));
+      }
+
+      /* --- Cartão de status --- */
+
+      #main-status-panel {
+        position: relative;
+        padding: 16px;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+      #main-status-panel::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--cor-status), transparent);
+      }
+
+      .status-topo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      #status-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--cor-status);
+        box-shadow: 0 0 10px var(--cor-status);
+        animation: pulseDot 1.6s ease-in-out infinite;
+        flex-shrink: 0;
+      }
+
+      #status-text {
+        display: block;
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 1.15;
+        letter-spacing: -0.01em;
+      }
+
+      #uptime {
+        display: block;
+        margin-top: 6px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: #6e7d79;
+      }
+
+      .varredura {
+        margin-top: 14px;
+        height: 4px;
+        border-radius: 2px;
+        background: #141a1c;
+        overflow: hidden;
+        position: relative;
+      }
+      .varredura::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        width: 38%;
+        background: linear-gradient(90deg, transparent, var(--cor-status), transparent);
+        animation: sweep 1.8s linear infinite;
+      }
+
+      /* --- Lista de conexão --- */
+
+      .conexao {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .conexao .rotulo {
+        padding: 0 2px 8px;
+      }
+
+      .linha {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 7px;
+        border: 1px solid transparent;
+      }
+      .linha:hover {
+        background: #101618;
+        border-color: #1d2528;
+      }
+      .linha b {
+        font-size: 12.5px;
+        font-weight: 400;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .valor {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--verde);
+        text-align: right;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .valor.neutro {
+        color: #c3ceca;
+      }
+      .valor.apagado {
+        color: #6e7d79;
+      }
+
+      /* --- Código de pareamento --- */
+
+      /* Só aparece enquanto não há aparelho pareado. É o que autoriza o tablet
+         a conectar, então tem que ser a coisa mais legível da janela. */
+      #painel-codigo {
+        padding: 14px 16px;
+        text-align: center;
+        flex-shrink: 0;
+        border-color: oklch(0.75 0.18 145 / 0.45);
+      }
+
+      #codigo-valor {
+        margin-top: 10px;
+        font-family: var(--mono);
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-indent: 0.22em; /* compensa o espaço extra depois do último dígito */
+        color: var(--verde-forte);
+        text-shadow: 0 0 24px oklch(0.8 0.2 145 / 0.35);
+      }
+
+      #codigo-prazo {
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--muted-2);
+      }
+
+      #codigo-novo {
+        margin-top: 12px;
+        width: 100%;
+        border: 1px solid #1e2629;
+        border-radius: 7px;
+        padding: 8px;
+        font-family: inherit;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #9aa8a4;
+        background: var(--painel-2);
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
+      }
+      #codigo-novo:hover {
+        color: var(--texto);
+        border-color: #2c3639;
+      }
+
+      /* --- Ações --- */
+
+      .acoes {
+        margin-top: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding-top: 8px;
+      }
+
+      button.acao {
+        border: 0;
+        border-radius: 8px;
+        padding: 13px;
+        font-family: inherit;
+        font-size: 13px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: filter 0.15s, box-shadow 0.15s, background 0.15s, color 0.15s,
+          border-color 0.15s;
+      }
+
+      #restart-server-btn {
+        font-weight: 700;
+        color: #04140b;
+        background: linear-gradient(135deg, oklch(0.85 0.2 145), oklch(0.68 0.19 152));
+        box-shadow: 0 0 0 1px oklch(0.85 0.2 145 / 0.3), 0 8px 24px oklch(0.7 0.2 145 / 0.22);
+      }
+      #restart-server-btn:hover {
+        filter: brightness(1.12);
+        box-shadow: 0 0 0 1px oklch(0.9 0.2 145 / 0.5), 0 10px 30px oklch(0.7 0.2 145 / 0.35);
+      }
+      #restart-server-btn:active {
+        transform: translateY(1px);
+      }
+
+      #forget-device-btn {
+        font-weight: 600;
+        color: #94a29e;
+        background: var(--painel-2);
+        border: 1px solid #1e2629;
+      }
+      #forget-device-btn:hover {
+        color: var(--texto);
+        border-color: #2c3639;
+        background: #131a1c;
+      }
+
+      /* --- Plugin no jogo --- */
+
+      #plugin-panel {
+        padding: 16px 18px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 20px;
+      }
+
+      .plugin-info {
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      #plugin-estado {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-top: 9px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      #plugin-estado .icone {
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 700;
+        flex-shrink: 0;
+        color: var(--cor-plugin, var(--muted));
+        background: color-mix(in oklch, var(--cor-plugin, var(--muted)) 14%, transparent);
+        border: 1px solid color-mix(in oklch, var(--cor-plugin, var(--muted)) 50%, transparent);
+      }
+
+      #plugin-origem {
+        margin-top: 10px;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+      #plugin-origem .fonte {
+        color: var(--verde);
+        font-weight: 600;
+      }
+
+      #plugin-caminho {
+        margin-top: 6px;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--muted-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+      }
+
+      .plugin-botoes {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      button.mini {
+        border: 1px solid #1e2629;
+        border-radius: 7px;
+        padding: 9px 13px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        color: #9aa8a4;
+        background: var(--painel-2);
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+      }
+      button.mini:hover:not(:disabled) {
+        color: var(--texto);
+        border-color: #2c3639;
+      }
+      button.mini.destaque {
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        color: oklch(0.88 0.2 145);
+        background: oklch(0.8 0.2 145 / 0.1);
+        border-color: oklch(0.75 0.18 145 / 0.45);
+      }
+      button.mini.destaque:hover:not(:disabled) {
+        background: oklch(0.8 0.2 145 / 0.2);
+      }
+      button.mini:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
+      /* --- Log --- */
+
+      .log-wrap {
+        border: 1px solid var(--borda);
+        border-radius: 10px;
+        background: rgba(7, 10, 11, 0.9);
+        display: grid;
+        grid-template-rows: auto 1fr;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .log-topo {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 11px 14px;
+        border-bottom: 1px solid #161d20;
+        background: rgba(14, 18, 20, 0.8);
+      }
+      .log-topo .esquerda {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .log-topo .rotulo {
+        color: #7d8c88;
+        font-weight: 700;
+      }
+
+      #log-count {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted-2);
+        padding: 2px 6px;
+        border: 1px solid #1e262a;
+        border-radius: 4px;
+      }
+
+      .log-acoes {
+        display: flex;
+        gap: 2px;
+      }
+
+      #log-clear,
+      #log-abrir {
+        border: 0;
+        background: transparent;
+        font-family: inherit;
+        font-size: 11px;
+        font-weight: 600;
+        color: #6e7d79;
+        padding: 4px 9px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+      }
+      #log-clear:hover,
+      #log-abrir:hover {
+        color: var(--texto);
+        background: #161d20;
+      }
+
+      #log-box {
+        overflow-y: auto;
+        padding: 10px 4px 10px 0;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        line-height: 1.75;
+      }
+
+      #log-box .entrada {
+        display: grid;
+        grid-template-columns: 74px 52px minmax(0, 1fr);
+        gap: 10px;
+        padding: 2px 14px;
+      }
+      #log-box .entrada:hover {
+        background: #0e1416;
+      }
+      #log-box .hora {
+        color: var(--mono-dim);
+      }
+      #log-box .tag {
+        font-weight: 700;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        padding-top: 1px;
+      }
+      #log-box .msg {
+        color: #93a19d;
+        word-break: break-word;
+      }
+
+      /* --- Rodapé --- */
+
+      footer {
+        border-top: 1px solid var(--borda-sutil);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #4d5a56;
+        background: rgba(9, 12, 13, 0.9);
+        position: relative;
+        z-index: 2;
+      }
+      footer .estado {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      #footer-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--cor-status);
+      }
+
+      /* Perto do tamanho mínimo a lateral encolhe em vez de empilhar: empilhada,
+         o log — que é o que interessa olhar — saía da tela. */
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 236px 1fr;
+        }
+        .lateral {
+          padding: 14px 12px;
+          gap: 12px;
+        }
+        .conteudo {
+          padding: 14px;
+          gap: 12px;
+        }
+        .linha {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 2px;
+          padding: 7px 8px;
+        }
+        .valor {
+          text-align: left;
+          max-width: 100%;
+        }
+        #plugin-panel {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 12px;
+        }
+        .plugin-botoes {
+          justify-content: flex-start;
+        }
+        #log-box .entrada {
+          grid-template-columns: 64px 46px minmax(0, 1fr);
+          gap: 8px;
+          padding: 2px 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="titulo">
+        <span class="marca"></span>
+        <span class="nome">ETS2 Server Status</span>
+        <span id="app-versao"></span>
+      </div>
+
+      <div class="controles">
+        <button id="minimize-btn" class="window-control" title="Minimizar">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M4 8a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 4 8" />
+          </svg>
+        </button>
+        <button id="maximize-btn" class="window-control" title="Maximizar">
+          <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+            <path
+              d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"
+            />
+          </svg>
+        </button>
+        <button id="close-btn" class="window-control" title="Fechar">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path
+              d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"
+            />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <div class="lateral">
+        <div id="main-status-panel" class="cartao">
+          <div class="status-topo">
+            <span id="status-dot"></span>
+            <span class="rotulo">Status do servidor</span>
+          </div>
+          <span id="status-text">Iniciando...</span>
+          <span id="uptime">uptime 00:00:00</span>
+          <div class="varredura"></div>
+        </div>
+
+        <div class="conexao">
+          <div class="rotulo">Conexão</div>
+          <div class="linha">
+            <b>IP do servidor</b>
+            <span id="ip-text" class="valor">Aguardando...</span>
+          </div>
+          <div class="linha">
+            <b>Outros endereços</b>
+            <span id="ips-text" class="valor neutro">—</span>
+          </div>
+          <div class="linha">
+            <b>Cliente conectado</b>
+            <span id="client-text" class="valor apagado">Nenhum</span>
+          </div>
+          <div class="linha">
+            <b>Aparelho pareado</b>
+            <span id="paired-text" class="valor neutro">Nenhum</span>
+          </div>
+        </div>
+
+        <div id="painel-codigo" class="cartao" hidden>
+          <div class="rotulo">Código de pareamento</div>
+          <div id="codigo-valor">------</div>
+          <div id="codigo-prazo">—</div>
+          <button id="codigo-novo">Gerar outro código</button>
+        </div>
+
+        <div class="acoes">
+          <button id="restart-server-btn" class="acao">Reiniciar servidor</button>
+          <button id="forget-device-btn" class="acao">Esquecer aparelho</button>
+        </div>
+      </div>
+
+      <div class="conteudo">
+        <div id="plugin-panel" class="cartao">
+          <div class="plugin-info">
+            <div class="rotulo">Plugin no jogo</div>
+            <div id="plugin-estado"><span class="icone">…</span><span>Verificando...</span></div>
+            <div id="plugin-origem">—</div>
+            <div id="plugin-caminho">—</div>
+          </div>
+          <div class="plugin-botoes">
+            <button id="plugin-escolher-btn" class="mini">Escolher pasta</button>
+            <button id="plugin-verificar-btn" class="mini">Verificar</button>
+            <button id="plugin-abrir-btn" class="mini">Abrir</button>
+            <button id="plugin-instalar-btn" class="mini destaque">Instalar plugin</button>
+          </div>
+        </div>
+
+        <div class="log-wrap">
+          <div class="log-topo">
+            <div class="esquerda">
+              <span class="rotulo">Log de eventos</span>
+              <span id="log-count">0 linhas</span>
+            </div>
+            <div class="log-acoes">
+              <button id="log-abrir">Abrir arquivo</button>
+              <button id="log-clear">Limpar</button>
+            </div>
+          </div>
+          <div id="log-box"></div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <span>Dashboard Server · Electron</span>
+      <span class="estado"><span id="footer-dot"></span><span id="footer-status">Iniciando...</span></span>
+    </footer>
+
+    <script src="status_renderer.js"></script>
+  </body>
+</html>

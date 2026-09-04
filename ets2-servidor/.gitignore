@@ -1,0 +1,13 @@
+node_modules/
+/out/
+/build/
+/dist/
+.env
+.DS_Store
+*.log
+*.exe
+*.msi
+*.nupkg
+*.zip
+.expo/
+/bin/pareamento.json

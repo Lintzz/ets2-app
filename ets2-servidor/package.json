@@ -1,0 +1,72 @@
+{
+  "name": "ets2_servidor",
+  "version": "1.3.0",
+  "description": "Servidor para Dashboard do Euro Truck Simulator 2 com addon nativo para leitura de memória.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lintzz/ets2-servidor.git"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "build:addon": "node scripts/build-addon.js",
+    "install": "node scripts/build-addon.js",
+    "test": "node testes/pareamento.js"
+  },
+  "keywords": [
+    "ets2",
+    "dashboard",
+    "telemetry",
+    "electron"
+  ],
+  "author": "Lintz",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1",
+    "node-addon-api": "^8.9.2",
+    "robotjs": "^0.9.1",
+    "update-electron-app": "^3.3.0",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "electron": "^44.1.1",
+    "node-gyp": "^11.4.2"
+  },
+  "config": {
+    "forge": {
+      "packagerConfig": {
+        "asar": {
+          "unpack": "**/*.node"
+        },
+        "name": "ETS2 Servidor",
+        "executableName": "ETS2_Servidor",
+        "icon": "icon",
+        "extraResource": [
+          "recursos/PluginETS2.dll"
+        ]
+      },
+      "rebuildConfig": {
+        "onlyModules": []
+      },
+      "makers": [
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "config": {
+            "name": "ets2_servidor",
+            "iconUrl": "https://raw.githubusercontent.com/Lintzz/ets2-servidor/main/icon.ico",
+            "setupIcon": "icon.ico",
+            "createDesktopShortcut": true
+          }
+        }
+      ]
+    }
+  }
+}
