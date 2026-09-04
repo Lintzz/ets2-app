@@ -64,6 +64,9 @@ function createMainWindow() {
     minWidth: 820,
     minHeight: 560,
     title: "ETS2 Server Status",
+    // Empacotado o ícone vem do .exe, mas em desenvolvimento a janela ficava
+    // com o ícone padrão do Electron na barra de tarefas.
+    icon: path.join(__dirname, process.platform === "win32" ? "icon.ico" : "icon.png"),
     show: false,
     frame: false,
     autoHideMenuBar: true,
@@ -180,7 +183,11 @@ app.whenReady().then(() => {
     Menu.setApplicationMenu(Menu.buildFromTemplate([]));
   }
 
-  tray = new Tray(path.join(__dirname, "icon.png"));
+  // O .ico traz todos os tamanhos (16 a 256) já ajustados: deixar o Windows
+  // reduzir o PNG de 512 apagava o traço fino do mostrador na bandeja.
+  tray = new Tray(
+    path.join(__dirname, process.platform === "win32" ? "icon.ico" : "icon.png")
+  );
 
   const contextMenu = Menu.buildFromTemplate([
     {
