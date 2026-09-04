@@ -1,0 +1,17 @@
+# Só o que pertence à raiz do monorepo.
+#
+# Cada projeto mantém o .gitignore dele — ets2-plugin/, ets2-servidor/ e
+# ets2-dashboard-fixo/ — e é assim de propósito: as regras conflitam entre si.
+# O ets2-plugin ignora *.dll (são artefatos de build do Visual Studio), mas o
+# ets2-servidor versiona recursos/PluginETS2.dll. Juntar tudo num arquivo só
+# apagaria essa DLL do índice.
+
+# Binários gerados por "npm run make" e "gradlew assembleRelease", montados aqui
+# para distribuir. São ~230 MB e saem de novo a cada build.
+INSTALADORES/
+
+# Masters do ícone, já versionados dentro dos projetos que os usam:
+# ets2-dashboard-fixo/extras/icone/ e ets2-servidor/icon-fonte-1024.png
+lz-icon-1024*.png
+
+.DS_Store

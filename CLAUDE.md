@@ -1,0 +1,268 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Repository layout
+
+`D:\Projetos\ets2-app` is a workspace folder, **not** a git repository. It contains three **independent git repositories** that must be committed and pushed separately:
+
+| Folder | Remote | Role |
+|---|---|---|
+| `ets2-plugin` | `github.com/Lintzz/ets2-plugin` | C++ DLL loaded by Euro Truck Simulator 2 (SCS SDK 1.14) |
+| `ets2-servidor` | `github.com/Lintzz/ets2-servidor` | Electron app on the PC — reads shared memory, serves WebSocket |
+| `ets2-dashboard-fixo` | `github.com/Lintzz/ets2-dashboard-fixo` | Expo / React Native tablet dashboard |
+
+Comments, commit messages, log strings and identifiers are in Portuguese. Keep that convention.
+
+## Architecture — the data path
+
+```
+ETS2 game process
+  └─ PluginETS2.dll                       ets2-plugin/PluginETS2/PluginETS2/main.cpp
+       registers ~55 SCS telemetry channels, each callback writes
+       directly into a field of `struct TelemetriaCompleta`
+       ↓
+  Win32 shared memory, name L"MeuDashboardETS2_Full"
+       ↓  read every 50 ms (20 Hz)
+  ETS2 Servidor (Electron)
+    main.js    tray + frameless status.html window; fork()s server.js
+               (contextIsolation + preload.js; no nodeIntegration)
+    server.js  (child process, talks to main.js only via process.send)
+      ├─ leitor_memoria.node   OpenFileMappingW → JS object   ets2-servidor/leitor_memoria.cpp
+      ├─ HTTP  GET /ets2 on :3000      → identifies the server to the app's scan
+      ├─ WebSocket  :3000 on 0.0.0.0   → telemetry out at 20 Hz, after a hello
+      ├─ UDP :48888                    → replies to probes; also broadcasts (legacy)
+      └─ robotjs                       → command in, allowlisted keys only
+       ↓  Wi-Fi
+  Dashboard app
+    hooks/descoberta.js      scans own /24 with GET /ets2 → finds the server
+    hooks/useTelemetry.js    discovery → WebSocket → hello → telemetry state
+    screens/ConexaoScreen.js status + manual IP entry fallback
+    screens/DashboardScreen.js  absolute-positioned grid, GRID_CELL_SIZE = 35
+    WidgetLibrary.js         catalogue of ~76 widget definitions
+```
+
+### The struct contract (most important thing to know)
+
+`struct TelemetriaCompleta` is **duplicated verbatim** in two files, both under `#pragma pack(push, 1)`:
+
+- `ets2-plugin/PluginETS2/PluginETS2/main.cpp` — the writer
+- `ets2-servidor/leitor_memoria.cpp` — the reader
+
+Both carry a `schemaVersion` + `tamanhoStruct` header and `TELEMETRIA_SCHEMA_VERSION` (currently **2**), which must also match `SCHEMA_ESPERADO` in `ets2-servidor/protocolo.js`. The reader validates the header at runtime and refuses to interpret mismatched memory, so a divergence now surfaces as "plugin desatualizado" in the server log instead of garbage on the dashboard. **Still edit both structs together**, bump the version in both, rebuild the DLL, rebuild the native addon, and redeploy the DLL into the game's plugins folder.
+
+Adding a new telemetry value end-to-end touches four places:
+1. field in both `TelemetriaCompleta` structs
+2. `REGISTRAR_CANAL(...)` line in `scs_telemetry_init` (`main.cpp`)
+3. `SET_BOOL`/`SET_FLOAT`/`SET_INT` line in `LerDados` (`leitor_memoria.cpp`) — note that speeds are converted to km/h here and exposed under different names (`velocidadeKmh`, `velocidadeCruzeiroKmh`, `navLimiteVelocidadeKmh`)
+4. a widget entry in `ets2-dashboard-fixo/WidgetLibrary.js`
+5. if the widget presses a key, add it to `TECLAS_PERMITIDAS` in `ets2-servidor/protocolo.js` — keys outside that allowlist are refused
+
+### Widget model (dashboard app)
+
+`WIDGET_LIBRARY` (`WidgetLibrary.js`) holds *what a widget is* — default `w`/`h`, `type`, and `options` including `iconName` (a MaterialCommunityIcons string, or an SVG component from `SvgLibrary.js`), the `key` sent to robotjs, `isContinuous`, and `isActiveCheck: (telemetry) => boolean` for the lit/unlit state. The `INITIAL_WIDGETS` array in `screens/DashboardScreen.js` holds *where it is* — `widgetKey` + `x`/`y`/`w`/`h` in grid cells. `rehydrateLayout` merges the two. The layout is hardcoded (hence "fixo"); the timestamped `id`s came from a visual editor that is not part of this repo.
+
+`DashboardWidget.js` dispatches on `config.type` (`ColorArea`, `TextWidget`, `CircularButton`, `IconButton`, `DataDisplay`, `FuelGauge`, `Alert`) and turns presses into `pressKey` / `holdKeyDown` + `holdKeyUp` depending on `options.isContinuous`.
+
+## Commands
+
+### ets2-plugin
+
+Built only from Visual Studio (VS 2022, toolset v143) — there is no CLI build script.
+
+```bash
+start ets2-plugin/PluginETS2/PluginETS2.sln
+```
+
+- Build **x64** — that is what ETS2 loads. Include paths are relative (`$(SolutionDir)..\SDK\scs_sdk_1_14\...`), so the solution builds from any checkout location.
+- Exports are pinned by `main.def` (`scs_telemetry_init`, `scs_telemetry_shutdown`).
+- Deploy: copy `x64/Release/PluginETS2.dll` to `...\Euro Truck Simulator 2\bin\win_x64\plugins\` (create the folder if missing) and launch the game in x64.
+
+### ets2-servidor
+
+```bash
+cd ets2-servidor
+npm install              # runs scripts/build-addon.js (needs VS Build Tools, C++ workload)
+npm run build:addon      # rebuild just leitor_memoria.node after editing the .cpp
+npm start                # electron .
+npm run make             # electron-forge → installer in out/make/
+```
+
+**Never build the addon with a bare `node-gyp rebuild`.** Electron Forge pulls in
+`@electron/node-gyp`, which hijacks `node_modules/.bin/node-gyp` and selects the
+clang-cl toolchain; that produces a `.node` that links cleanly but returns
+garbage for every `Napi::Number` (values differ on each run). `scripts/build-addon.js`
+resolves the real `node-gyp` by path to avoid this, and `server.js` verifies
+`leitorMemoria.schemaVersion` at startup so a bad build is reported instead of
+silently corrupting telemetry. Both native modules are N-API, so no rebuild for
+Electron is needed — `rebuildConfig` is `{ onlyModules: [] }` on purpose.
+
+### ets2-dashboard-fixo
+
+```bash
+cd ets2-dashboard-fixo
+npm install
+npx expo start --dev-client   # NOT Expo Go
+npm run android               # expo run:android
+eas build --profile development --platform android
+```
+
+Expo SDK 57 / RN 0.86 (New Architecture). The app uses native modules
+(`expo-network`, async-storage, gesture-handler, svg), so **Expo Go will not
+work** — a development build (`expo-dev-client`) or `expo run:android` is
+required. `metro.config.js` routes `.svg` through `react-native-svg-transformer`,
+so SVGs in `assets/` are imported as React components (see `SvgLibrary.js`).
+Run `npx expo-doctor` after touching dependencies; it currently passes 21/21.
+
+Local release APK (JDK 21 from Android Studio's JBR, SDK 36):
+
+```bash
+npx expo prebuild --platform android --clean
+# the template ships MaxMetaspaceSize=512m, which OOMs the New Architecture
+# codegen; android/ is regenerated by prebuild so this must be redone each time
+sed -i 's|^org.gradle.jvmargs=.*|org.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=2048m|' android/gradle.properties
+cd android && JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleRelease
+```
+
+Output: `android/app/build/outputs/apk/release/app-release.apk`, signed with the
+debug keystore (Expo template default) — fine for sideloading, not for the Play
+Store. `android/` and `ios/` are gitignored.
+
+`ets2-servidor` has `npm test` (`testes/pareamento.js`, no dependencies beyond
+`ws`). There is no linter or formatter in any of the three projects, and the
+other two have no tests.
+
+## Installing the plugin into the game
+
+`ets2-servidor/instalador-plugin.js` locates ETS2 (Steam path from the registry,
+then every library in `steamapps/libraryfolders.vdf`), validates a folder by the
+presence of `bin/win_x64/eurotrucks2.exe`, creates `bin/win_x64/plugins`, backs
+up any existing DLL as `.bak`, and copies the bundled one. It is a no-op when
+the hashes already match, and reports a "close the game" message on EBUSY/EPERM.
+
+`plugin-remoto.js` picks which DLL to install: it queries the latest release of
+`Lintzz/ets2-plugin`, downloads the `PluginETS2.dll` asset into
+`userData/plugin-cache/PluginETS2-<tag>.dll` (reused on later runs), and falls
+back to the bundled copy whenever the network, the API, or the payload fails —
+the download is rejected unless it starts with `MZ` and has a sane size. This
+keeps the plugin current without reinstalling the server: publishing a new
+`ets2-plugin` release is enough. Resolution is cached per run;
+`plugin:verificar-atualizacao` forces a re-check.
+
+The fallback DLL ships from `recursos/PluginETS2.dll` (committed) and reaches the
+packaged app through `packagerConfig.extraResource`, so at runtime it is
+`process.resourcesPath/PluginETS2.dll` when `app.isPackaged`, else
+`__dirname/recursos/`. Note `userData` is `%APPDATA%\ets2_servidor` (from
+package.json `name`), not the packager's display name. The chosen game folder is remembered in
+`config.json` under Electron's `userData`. UI lives in the "Plugin no jogo"
+panel of `status.html`; IPC uses `ipcMain.handle("plugin:*")`.
+
+**After changing `main.cpp`, rebuild the DLL and refresh `recursos/PluginETS2.dll`** —
+otherwise the app ships the old schema and the server refuses the telemetry.
+
+## Discovery and pairing
+
+The app finds the server by **scanning its own /24** (`hooks/descoberta.js`): it
+reads the device IP with `expo-network`, then issues `GET http://<ip>:3000/ets2`
+across the subnet (24 in flight, 800 ms timeout each, nearest addresses first)
+and takes the first host that answers with `{"t":"ets2-server"}`. The last
+working address is cached in AsyncStorage and tried first, so only the first
+launch pays the ~7 s scan.
+
+This replaced a server-side UDP broadcast, which is why the app used to work
+only over USB tethering: many routers do not forward directed broadcast from
+the wired side to the Wi-Fi radio, and Android drops broadcast frames without a
+multicast lock. The scan is ordinary unicast, so it crosses any router. The
+server still answers UDP probes and broadcasts on :48888 for compatibility, but
+the app no longer depends on it. `ConexaoScreen.js` offers manual IP entry as
+the guaranteed fallback.
+
+Pairing (protocol 3): the server speaks first, sending
+`{type:"challenge", nonce, pareado}`. The client answers with `hello` within 5 s
+or the socket is closed:
+
+- **first time** — `{type:"hello", protocolo, deviceId, nome, codigo}`, where
+  `codigo` is the 6-digit code shown in the status window (single use, expires in
+  10 min, regenerated by "Gerar outro código"). On success the server draws a
+  32-byte secret, saves it in `pareamento.json` (mode 0600, in `userData`) and
+  returns it once in the `welcome`.
+- **afterwards** — `{..., prova}` where `prova` is
+  `SHA-256(nonce + ":" + segredo)`. The secret never travels again, so sniffing
+  the network yields a proof that is useless for the next nonce.
+
+Refusals come back as `{type:"denied", reason}` with `reason` from `RECUSA` in
+`protocolo.js`. Protocol 2 (the old "first device on the network wins") is
+refused on purpose — a guest on the Wi-Fi, or a web page open in any browser on
+the LAN, could take the slot and inject keystrokes. `verifyClient` also rejects
+any handshake carrying an `Origin` header, which is exactly what a browser sends
+and a native app never does. Clear the pairing from the tray menu or the status
+window ("Esquecer aparelho"); that also mints a new code.
+
+`npm test` (`testes/pareamento.js`) boots the real `server.js` on port 31998
+with robotjs and the native addon stubbed, and covers all ten accept/refuse
+paths, including replay and the browser `Origin` case.
+
+## Operational notes
+
+- Keys are checked against `TECLAS_PERMITIDAS` (`protocolo.js`) before reaching
+  robotjs, and keys still held when a client disconnects are released.
+- Three states reach the app: full telemetry object (playing), `{jogoRodando:false, inMenu:true}` (menu/paused/idle), and `null` (game not running or not connected). `DashboardScreen` renders `ConexaoScreen` only for `null`. In the menu the grid stays on screen with `aoVivo={false}` — buttons keep working (the ESC widget is how you get back into the game) while the readouts show `--` instead of stale or zeroed values.
+- `main.js` runs `firewall.js` at startup to add inbound rules for TCP 3000 / UDP 48888 with `profile=private,domain` — **not** `any`, which used to leave the port open on Public networks (hotel, café). An existing rule from an older install is rewritten with `netsh ... set rule` (idempotent, locale-independent). Without admin rights it logs the exact `netsh` command instead. Playing on a network Windows marked as Public means changing it to Private, which is the correct setting for a home network anyway.
+- Everything logged to the window is also appended to `userData/logs/servidor.log` (`registro.js`, 1 MB × 4 files rotation). "Abrir arquivo" in the log header opens the folder — that is what to ask for when someone reports "it doesn't connect".
+- `atualizador.js` wires `update-electron-app` to update.electronjs.org, which reads the public GitHub releases. It only runs from a packaged install on Windows, needs the `npm run make` artifacts attached to the release, and does not remove the SmartScreen warning — that needs a code-signing certificate.
+- Interface selection is scored, not first-come (`pontuar()` in `server.js`): VPN and virtual adapters are penalised. On this machine a Radmin VPN adapter (26.x/8) sorts before the real Ethernet, and the old `addresses[0]` logic announced that unreachable address.
+- The Electron window uses `contextIsolation: true` with `preload.js`; the renderer talks to the main process only through `window.servidor`. `status.html` has no CDN dependency — its fonts are base64-embedded in `fontes/fontes.css` — so it renders correctly offline.
+- On Android the system bars are hidden natively, through the `expo-status-bar` and `expo-navigation-bar` config plugins in `app.json` (they write `styles.xml`). Hiding them only from JS, as before, left the bar drawn over the dashboard under the edge-to-edge mode Android 15 forces. `App.js` still calls `NavigationBar.setHidden(true)` when the app resumes; `setVisibilityAsync`/`setBehaviorAsync` are deprecated in expo-navigation-bar 57 and must not be reintroduced.
+
+## Icons
+
+The brand mark is a white gauge with an "Lz" wordmark, on `#0B0B0B`. Two masters
+exist: **rounded** (alpha corners) and **square**. Which one goes where is not a
+preference — it depends on whether the platform applies its own mask.
+
+| Target | File | Source | Why |
+|---|---|---|---|
+| Windows exe + tray | `ets2-servidor/icon.ico` | rounded | Windows never masks; a square would be a hard black block |
+| Android legacy / stores | `assets/icon.png` | rounded | used as-is by old launchers |
+| Android adaptive fg | `assets/adaptive-icon.png` | **recomposed** | the system masks it — see below |
+| Android themed | `assets/monochrome-icon.png` | same as adaptive | Android 13+ tints it |
+| Splash | `assets/splash-icon.png` | artwork only, transparent | floats on the splash background |
+
+The adaptive foreground is **not** either master. An adaptive icon only
+guarantees a central circle of 66/108 of the canvas, and the "Lz" sitting in the
+bottom-right corner of the master is clipped by every circular mask (the Pixel
+launcher's). So the foreground is recomposed: the gauge centred, the "Lz" moved
+into the gauge's open bottom, everything inside the safe circle. Masters live in
+`ets2-dashboard-fixo/extras/icone/` and `ets2-servidor/icon-fonte-1024.png`.
+
+Regenerating (ImageMagick 7). First lift the artwork off its plate — the master's
+background is `#0B0B0B`, not pure black, so the `-level` is what stops a 4% grey
+veil from surviving into the alpha:
+
+```bash
+magick "lz-icon-1024-quadrado.png" -alpha off -colorspace sRGB \
+  \( +clone -colorspace gray -level 8%,100% \) -compose CopyOpacity -composite \
+  -fill white -colorize 100 -colorspace sRGB arte.png
+```
+
+Then split `arte.png` into the gauge and the wordmark, and recompose at
+620 px / 112 px with the wordmark at `+0+172` from centre. For `icon.ico`, sizes
+16/24/32 get `-channel RGB -level 0%,72%` before packing: the 1 px arc turns mid
+grey in a plain downscale and the tray icon comes out muddy.
+
+Squirrel's `iconUrl` (the icon shown in Programs and Features) must be a public
+URL to an ICO, so it points at
+`raw.githubusercontent.com/Lintzz/ets2-servidor/main/icon.ico` — the repo's own
+committed icon. Replacing `icon.ico` and pushing is therefore enough to update
+it; there is no third-party host in the loop. Note `raw` caches for a few
+minutes, so it lags a push. `setupIcon` is the local `icon.ico`.
+
+## Still missing for a "hand it to strangers" release
+
+Code signing is **deliberately out of scope** — the owner has decided the
+Windows installer stays unsigned (SmartScreen will warn on every install) and
+the APK keeps the Expo debug keystore. Do not propose it again.
+
+- The plugin DLL downloaded from GitHub is validated only by the `MZ` magic and a size range (`plugin-remoto.js`) — no hash or signature check.
+- Traffic is plain `ws://` (`usesCleartextTraffic: true` in `app.json`).
+- No linter or formatter in any of the three repos; `npm test` exists only in `ets2-servidor`, and there is no CI.
