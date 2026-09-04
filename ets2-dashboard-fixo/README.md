@@ -42,9 +42,9 @@ Acesse o nosso site oficial para mais informações, downloads e guias rápidos:
 
 ### 🔄 Como o ecossistema funciona?
 O projeto é composto por 3 partes principais que trabalham em conjunto para trazer a telemetria do jogo para suas mãos:
-1. **[Plugin (C++)](https://github.com/Lintzz/ets2-plugin)**: Roda diretamente dentro do Euro Truck Simulator 2, lendo os dados de telemetria em tempo real e os disponibiliza na memória do PC (Shared Memory).
-2. **[Servidor (Node.js/Electron)](https://github.com/Lintzz/ets2-servidor)**: Roda no seu PC, lendo os dados disponibilizados pelo Plugin na memória. Ele cria um servidor WebSocket local e os transmite para a rede.
-3. **[Dashboard (App Mobile/Web)](https://github.com/Lintzz/ets2-dashboard-fixo)**: O seu dispositivo (celular/tablet) se conecta ao Servidor através do Wi-Fi (via WebSocket) para exibir todas as informações (velocidade, RPM, combustível, etc.) e pode enviar comandos de volta para o jogo.
+1. **[Plugin (C++)](https://github.com/Lintzz/ets2-app/tree/main/ets2-plugin)**: Roda diretamente dentro do Euro Truck Simulator 2, lendo os dados de telemetria em tempo real e os disponibiliza na memória do PC (Shared Memory).
+2. **[Servidor (Node.js/Electron)](https://github.com/Lintzz/ets2-app/tree/main/ets2-servidor)**: Roda no seu PC, lendo os dados disponibilizados pelo Plugin na memória. Ele cria um servidor WebSocket local e os transmite para a rede.
+3. **[Dashboard (App Mobile/Web)](https://github.com/Lintzz/ets2-app/tree/main/ets2-dashboard-fixo)**: O seu dispositivo (celular/tablet) se conecta ao Servidor através do Wi-Fi (via WebSocket) para exibir todas as informações (velocidade, RPM, combustível, etc.) e pode enviar comandos de volta para o jogo.
 
 ---
 
@@ -66,10 +66,10 @@ Antes de começar, você vai precisar ter instalado na sua máquina o [Node.js](
 
 ```bash
 # Clone este repositório
-$ git clone https://github.com/Lintzz/ets2-dashboard-fixo.git
+$ git clone https://github.com/Lintzz/ets2-app.git
 
 # Acesse a pasta do projeto no terminal
-$ cd ets2-dashboard-fixo
+$ cd ets2-app/ets2-dashboard-fixo
 
 # Instale as dependências
 $ npm install

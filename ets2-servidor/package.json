@@ -4,7 +4,7 @@
   "description": "Servidor para Dashboard do Euro Truck Simulator 2 com addon nativo para leitura de memória.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Lintzz/ets2-servidor.git"
+    "url": "https://github.com/Lintzz/ets2-app.git"
   },
   "main": "main.js",
   "scripts": {
@@ -61,7 +61,7 @@
           "name": "@electron-forge/maker-squirrel",
           "config": {
             "name": "ets2_servidor",
-            "iconUrl": "https://raw.githubusercontent.com/Lintzz/ets2-servidor/main/icon.ico",
+            "iconUrl": "https://raw.githubusercontent.com/Lintzz/ets2-app/main/ets2-servidor/icon.ico",
             "setupIcon": "icon.ico",
             "createDesktopShortcut": true
           }

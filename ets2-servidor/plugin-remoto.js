@@ -12,9 +12,15 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const REPO = "Lintzz/ets2-plugin";
-const API_RELEASE = `https://api.github.com/repos/${REPO}/releases/latest`;
+const REPO = "Lintzz/ets2-app";
 const NOME_ASSET = "PluginETS2.dll";
+
+// O repositório é um monorepo: as releases do plugin, do servidor e do
+// aplicativo convivem nele, separadas pelo prefixo da tag. Por isso NÃO dá para
+// usar /releases/latest — esse endpoint devolve a mais recente por DATA,
+// ignorando a tag, e traria a release do servidor, que não tem a DLL.
+const API_RELEASES = `https://api.github.com/repos/${REPO}/releases?per_page=30`;
+const PREFIXO_TAG = "plugin-";
 
 const TIMEOUT_CONSULTA_MS = 6000;
 const TIMEOUT_DOWNLOAD_MS = 30000;
@@ -54,16 +60,29 @@ function pareceUmaDll(buffer) {
 
 const hashDe = (buffer) => crypto.createHash("md5").update(buffer).digest("hex");
 
-// Consulta a última release. Devolve null quando não há rede — sem barulho, é
-// uma situação esperada.
+// Consulta a release mais recente do plugin. Devolve null quando não há rede —
+// sem barulho, é uma situação esperada.
 async function consultarUltimaRelease() {
   try {
-    const resposta = await buscarComTimeout(API_RELEASE, TIMEOUT_CONSULTA_MS);
+    const resposta = await buscarComTimeout(API_RELEASES, TIMEOUT_CONSULTA_MS);
     if (!resposta.ok) return null;
 
-    const release = await resposta.json();
-    const asset = (release.assets || []).find((a) => a.name === NOME_ASSET);
-    if (!asset) return null;
+    // A API já devolve da mais nova para a mais velha. Rascunhos e pré-releases
+    // ficam de fora: quem instala o plugin é o usuário final.
+    const lista = await resposta.json();
+    if (!Array.isArray(lista)) return null;
+
+    const release = lista.find(
+      (r) =>
+        typeof r.tag_name === "string" &&
+        r.tag_name.startsWith(PREFIXO_TAG) &&
+        !r.draft &&
+        !r.prerelease &&
+        (r.assets || []).some((a) => a.name === NOME_ASSET)
+    );
+    if (!release) return null;
+
+    const asset = release.assets.find((a) => a.name === NOME_ASSET);
 
     return {
       tag: release.tag_name,

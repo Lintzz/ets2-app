@@ -9,8 +9,10 @@
 //
 // Requisitos para funcionar de verdade:
 //   1. o repositório precisa ser público;
-//   2. cada release precisa levar os artefatos do `npm run make`
-//      (RELEASES, *.nupkg e o .exe do Squirrel);
+//   2. cada release do servidor precisa levar os artefatos do `npm run make`
+//      (RELEASES, *.nupkg e o .exe do Squirrel). No monorepo as releases do
+//      servidor usam tag `vX.Y.Z` sem prefixo, justamente para o serviço as
+//      reconhecer como semver — as do plugin e do app levam prefixo;
 //   3. o app precisa estar instalado (não roda em `npm start`).
 //
 // Note que o Windows ainda vai mostrar o aviso do SmartScreen enquanto o
@@ -39,7 +41,7 @@ function iniciarAtualizacoes(registrarLog) {
     updateElectronApp({
       updateSource: {
         type: UpdateSourceType.ElectronPublicUpdateService,
-        repo: "Lintzz/ets2-servidor",
+        repo: "Lintzz/ets2-app",
       },
       updateInterval: INTERVALO,
       // O log do pacote vai para a mesma janela e o mesmo arquivo que o resto.

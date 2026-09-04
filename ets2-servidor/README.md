@@ -33,7 +33,7 @@ Ele utiliza um addon nativo em C++ para ler dados da memória do jogo em alta pe
 - [x] **Controle Remoto de Teclas:** comandos remotos via RobotJS, restritos a uma allowlist de teclas — nenhum cliente consegue digitar texto arbitrário no PC.
 - [x] **Pareamento de Aparelho:** o primeiro tablet que conecta é memorizado; os demais são recusados até você clicar em "Esquecer aparelho".
 - [x] **Firewall Automático:** cria as regras de entrada para TCP 3000 e UDP 48888 em todos os perfis de rede (o motivo mais comum de funcionar no cabo e não no Wi-Fi).
-- [x] **Instalação do Plugin pelo App:** detecta a pasta do ETS2 automaticamente (lê as bibliotecas do Steam), cria a pasta `plugins` e instala a DLL — com backup da versão anterior. A DLL vem da **última release de [ets2-plugin](https://github.com/Lintzz/ets2-plugin/releases)**, então o plugin fica sempre em dia sem precisar reinstalar o servidor; sem internet, usa a cópia que acompanha o instalador.
+- [x] **Instalação do Plugin pelo App:** detecta a pasta do ETS2 automaticamente (lê as bibliotecas do Steam), cria a pasta `plugins` e instala a DLL — com backup da versão anterior. A DLL vem da **última release de [ets2-plugin](https://github.com/Lintzz/ets2-app/releases)**, então o plugin fica sempre em dia sem precisar reinstalar o servidor; sem internet, usa a cópia que acompanha o instalador.
 - [x] **Interface Oculta e Tray:** Aplicação Electron com janela customizada e suporte a modo silencioso no System Tray.
 
 ---
@@ -44,9 +44,9 @@ Acesse o nosso site oficial para mais informações, downloads e guias rápidos:
 
 ### 🔄 Como o ecossistema funciona?
 O projeto é composto por 3 partes principais que trabalham em conjunto para trazer a telemetria do jogo para suas mãos:
-1. **[Plugin (C++)](https://github.com/Lintzz/ets2-plugin)**: Roda diretamente dentro do Euro Truck Simulator 2, lendo os dados de telemetria em tempo real e os disponibiliza na memória do PC (Shared Memory).
-2. **[Servidor (Node.js/Electron)](https://github.com/Lintzz/ets2-servidor)**: Roda no seu PC, lendo os dados disponibilizados pelo Plugin na memória. Ele cria um servidor WebSocket local e os transmite para a rede.
-3. **[Dashboard (App Mobile/Web)](https://github.com/Lintzz/ets2-dashboard-fixo)**: O seu dispositivo (celular/tablet) se conecta ao Servidor através do Wi-Fi (via WebSocket) para exibir todas as informações (velocidade, RPM, combustível, etc.) e pode enviar comandos de volta para o jogo.
+1. **[Plugin (C++)](https://github.com/Lintzz/ets2-app/tree/main/ets2-plugin)**: Roda diretamente dentro do Euro Truck Simulator 2, lendo os dados de telemetria em tempo real e os disponibiliza na memória do PC (Shared Memory).
+2. **[Servidor (Node.js/Electron)](https://github.com/Lintzz/ets2-app/tree/main/ets2-servidor)**: Roda no seu PC, lendo os dados disponibilizados pelo Plugin na memória. Ele cria um servidor WebSocket local e os transmite para a rede.
+3. **[Dashboard (App Mobile/Web)](https://github.com/Lintzz/ets2-app/tree/main/ets2-dashboard-fixo)**: O seu dispositivo (celular/tablet) se conecta ao Servidor através do Wi-Fi (via WebSocket) para exibir todas as informações (velocidade, RPM, combustível, etc.) e pode enviar comandos de volta para o jogo.
 
 ---
 
@@ -69,10 +69,10 @@ Antes de começar, você vai precisar ter instalado na sua máquina o [Node.js](
 
 ```bash
 # Clone este repositório
-$ git clone https://github.com/Lintzz/ets2-servidor.git
+$ git clone https://github.com/Lintzz/ets2-app.git
 
 # Acesse a pasta do projeto no terminal
-$ cd ets2-servidor
+$ cd ets2-app/ets2-servidor
 
 # Instale as dependências e compile o addon nativo
 $ npm install
@@ -103,7 +103,7 @@ O painel mostra o estado atual: *não instalado*, *instalado mas de outra versã
 
 ### De onde vem a DLL
 
-O servidor consulta a última release de [`ets2-plugin`](https://github.com/Lintzz/ets2-plugin/releases/latest) e baixa a `PluginETS2.dll` de lá, guardando em cache no `userData`. Assim o plugin acompanha o repositório do plugin, e não a data em que o instalador do servidor foi gerado — basta publicar uma release nova para todo mundo receber.
+O servidor consulta a última release de [`ets2-plugin`](https://github.com/Lintzz/ets2-app/releases) e baixa a `PluginETS2.dll` de lá, guardando em cache no `userData`. No monorepo as releases do plugin levam a tag `plugin-vX.Y.Z`, e é por esse prefixo que o servidor as encontra. Assim o plugin acompanha a última release publicada, e não a data em que o instalador do servidor foi gerado — basta publicar uma release nova para todo mundo receber.
 
 O painel mostra a origem em uso (*release vX* ou *a que veio no instalador*) e o botão **Verificar** força uma nova consulta.
 

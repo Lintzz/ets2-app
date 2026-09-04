@@ -4,13 +4,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository layout
 
-`D:\Projetos\ets2-app` is a workspace folder, **not** a git repository. It contains three **independent git repositories** that must be committed and pushed separately:
+`D:\Projetos\ets2-app` is a **single git repository** (`github.com/Lintzz/ets2-app`)
+holding three projects that ship as one product:
 
-| Folder | Remote | Role |
+| Folder | Role |
+|---|---|
+| `ets2-plugin` | C++ DLL loaded by Euro Truck Simulator 2 (SCS SDK 1.14) |
+| `ets2-servidor` | Electron app on the PC — reads shared memory, serves WebSocket |
+| `ets2-dashboard-fixo` | Expo / React Native tablet dashboard |
+
+It used to be three separate repositories. They were merged because every change
+in the history spanned two or three of them: two contracts are duplicated across
+the folder boundaries (see the struct and `protocolo.js` below), and adding one
+telemetry field touches all three. A change like that is now one atomic commit.
+The three former repos are archived on GitHub; their history was rewritten into
+these subdirectories with `git filter-repo`, so `git log -- ets2-plugin/` and
+`git blame` reach back to 2025.
+
+**Each project keeps its own `.gitignore`, and they must not be merged into one.**
+`ets2-plugin/.gitignore` ignores `*.dll` (Visual Studio build output) while
+`ets2-servidor` deliberately versions `recursos/PluginETS2.dll`; a single root
+file would drop that DLL from the index. Same for the plugin's `x64/` and
+`[Rr]elease/`, and the app's anchored `/android` and `/ios`. The root
+`.gitignore` only covers `INSTALADORES/` and the loose icon masters.
+
+### Releases live in one repo, separated by tag prefix
+
+| Component | Tag | Consumer |
 |---|---|---|
-| `ets2-plugin` | `github.com/Lintzz/ets2-plugin` | C++ DLL loaded by Euro Truck Simulator 2 (SCS SDK 1.14) |
-| `ets2-servidor` | `github.com/Lintzz/ets2-servidor` | Electron app on the PC — reads shared memory, serves WebSocket |
-| `ets2-dashboard-fixo` | `github.com/Lintzz/ets2-dashboard-fixo` | Expo / React Native tablet dashboard |
+| servidor | `vX.Y.Z` — **no prefix** | update.electronjs.org, which parses the tag as semver |
+| plugin | `plugin-vX.Y.Z` | `plugin-remoto.js`, which filters by this prefix |
+| app | `app-vX.Y.Z` | none |
+
+The asymmetry is deliberate. `plugin-remoto.js` must **not** use
+`/releases/latest` — that endpoint returns the newest release by *date*,
+ignoring the tag, so it would hand back a server release with no DLL in it. It
+lists `/releases` and takes the first `plugin-` tagged one instead.
 
 Comments, commit messages, log strings and identifiers are in Portuguese. Keep that convention.
 
@@ -140,13 +169,13 @@ presence of `bin/win_x64/eurotrucks2.exe`, creates `bin/win_x64/plugins`, backs
 up any existing DLL as `.bak`, and copies the bundled one. It is a no-op when
 the hashes already match, and reports a "close the game" message on EBUSY/EPERM.
 
-`plugin-remoto.js` picks which DLL to install: it queries the latest release of
-`Lintzz/ets2-plugin`, downloads the `PluginETS2.dll` asset into
-`userData/plugin-cache/PluginETS2-<tag>.dll` (reused on later runs), and falls
-back to the bundled copy whenever the network, the API, or the payload fails —
-the download is rejected unless it starts with `MZ` and has a sane size. This
-keeps the plugin current without reinstalling the server: publishing a new
-`ets2-plugin` release is enough. Resolution is cached per run;
+`plugin-remoto.js` picks which DLL to install: it lists the repo's releases,
+takes the newest one tagged `plugin-*` that actually carries a `PluginETS2.dll`
+asset, downloads it into `userData/plugin-cache/PluginETS2-<tag>.dll` (reused on
+later runs), and falls back to the bundled copy whenever the network, the API,
+or the payload fails — the download is rejected unless it starts with `MZ` and
+has a sane size. This keeps the plugin current without reinstalling the server:
+publishing a new `plugin-vX.Y.Z` release is enough. Resolution is cached per run;
 `plugin:verificar-atualizacao` forces a re-check.
 
 The fallback DLL ships from `recursos/PluginETS2.dll` (committed) and reaches the
@@ -252,7 +281,7 @@ grey in a plain downscale and the tray icon comes out muddy.
 
 Squirrel's `iconUrl` (the icon shown in Programs and Features) must be a public
 URL to an ICO, so it points at
-`raw.githubusercontent.com/Lintzz/ets2-servidor/main/icon.ico` — the repo's own
+`raw.githubusercontent.com/Lintzz/ets2-app/main/ets2-servidor/icon.ico` — the repo's own
 committed icon. Replacing `icon.ico` and pushing is therefore enough to update
 it; there is no third-party host in the loop. Note `raw` caches for a few
 minutes, so it lags a push. `setupIcon` is the local `icon.ico`.
