@@ -243,6 +243,7 @@ function dllEmbutida() {
 
 const PASTA_CACHE_PLUGIN = () => path.join(app.getPath("userData"), "plugin-cache");
 
+
 // Resolvida uma vez por execução: a DLL da última release do repositório do
 // plugin, ou a embutida se o GitHub não estiver acessível.
 let dllResolvida = null;
@@ -294,7 +295,7 @@ async function estadoDoPlugin(opcoes) {
     dll: dll.caminho,
     origem: dll.origem,
     motivo: dll.motivo,
-    tag: dll.release ? dll.release.tag : null,
+    tag: dll.release ? dll.release.versao : null,
     paginaRelease: dll.release ? dll.release.pagina : null,
   };
 
@@ -387,7 +388,7 @@ ipcMain.handle("plugin:instalar", async () => {
   );
 
   if (resultado.ok) salvarConfig({ pastaETS2: pasta });
-  return { ...resultado, origem: dll.origem, tag: dll.release?.tag, estado: await estadoDoPlugin() };
+  return { ...resultado, origem: dll.origem, tag: dll.release?.versao, estado: await estadoDoPlugin() };
 });
 
 // Reconsulta a release, ignorando o que já foi resolvido nesta execução.

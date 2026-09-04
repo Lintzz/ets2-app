@@ -1,8 +1,8 @@
 // ETS2_Servidor/plugin-remoto.js
 //
-// Busca a PluginETS2.dll mais recente na release do repositório do plugin, para
-// que o servidor instale sempre a versão atual — e não a que estava embutida no
-// dia em que este instalador foi gerado.
+// Busca a PluginETS2.dll da release mais recente do plugin, para que o servidor
+// instale sempre a versão atual — e não a que estava embutida no dia em que este
+// instalador foi gerado.
 //
 // A DLL embutida (recursos/PluginETS2.dll) continua sendo o plano B: este é um
 // app para jogar, o PC pode estar sem internet, e nesse caso a instalação
@@ -86,6 +86,9 @@ async function consultarUltimaRelease() {
 
     return {
       tag: release.tag_name,
+      // A tag carrega o prefixo do monorepo; "versao" é o que se mostra ao
+      // usuário. O prefixo é assunto do repositório, não dele.
+      versao: release.tag_name.slice(PREFIXO_TAG.length),
       publicadoEm: release.published_at,
       url: asset.browser_download_url,
       tamanho: asset.size,
@@ -159,7 +162,7 @@ async function melhorDllDisponivel(dllEmbutida, pastaCache) {
     origem: "release",
     release,
     doCache: baixada.doCache,
-    motivo: `Plugin ${release.tag} obtido do GitHub.`,
+    motivo: `Plugin ${release.versao} obtido do GitHub.`,
   };
 }
 
