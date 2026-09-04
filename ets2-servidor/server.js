@@ -352,17 +352,40 @@ const server = http.createServer((req, res) => {
   res.writeHead(404).end();
 });
 
-// O app é nativo e nunca manda cabeçalho Origin. Um navegador SEMPRE manda.
-// Sem esta checagem, uma página qualquer que o usuário abrisse podia varrer a
-// rede local, achar este servidor, conectar e — se ainda não houvesse aparelho
-// pareado — virar o par e digitar teclas no PC, sem o atacante estar na rede.
+// Barra o ataque de "drive-by": sem isto, uma página web qualquer que o usuário
+// abrisse podia varrer a rede local, achar este servidor, conectar e — se ainda
+// não houvesse aparelho pareado — virar o par e digitar teclas no PC, sem o
+// atacante precisar estar na rede.
+//
+// O que NÃO dá para fazer é recusar toda conexão que tenha Origin. O React
+// Native manda esse cabeçalho sempre, derivado da própria URL do WebSocket
+// (WebSocketModule.kt: `builder.addHeader("origin", getDefaultOrigin(url))`,
+// que transforma ws://host:porta em http://host:porta). Recusar por presença
+// barrava justamente o tablet.
+//
+// O critério certo é a MESMA ORIGEM: aceitar sem Origin, ou com Origin igual ao
+// endereço deste próprio servidor. Um site de terceiro manda a origem dele
+// (https://site.exemplo) e o navegador não deixa a página forjar esse valor —
+// então continua barrado. E este servidor não serve página HTML nenhuma, então
+// não existe página "de mesma origem" para um atacante usar.
+function mesmaOrigem(origin, host) {
+  if (!host) return false;
+  return origin === `http://${host}` || origin === `https://${host}`;
+}
+
 function verificarOrigem({ origin, req }, aceitar) {
-  if (origin) {
-    log(`>>> Conexão RECUSADA de ${(req.socket.remoteAddress || "").replace("::ffff:", "")}: veio de um navegador (Origin: ${origin}). <<<`);
-    aceitar(false, 403, "origem-nao-permitida");
+  const ip = (req.socket.remoteAddress || "").replace("::ffff:", "");
+
+  if (!origin || mesmaOrigem(origin, req.headers.host)) {
+    aceitar(true);
     return;
   }
-  aceitar(true);
+
+  log(
+    `>>> Conexão RECUSADA de ${ip}: veio de outra origem (Origin: ${origin}), ` +
+      `o que indica uma página aberta num navegador. <<<`
+  );
+  aceitar(false, 403, "origem-nao-permitida");
 }
 
 const wss = new WebSocket.Server({ server, verifyClient: verificarOrigem });

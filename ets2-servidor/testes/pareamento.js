@@ -79,12 +79,11 @@ function conectar(montarHello) {
   });
 }
 
-// Conexão com Origin, como um navegador faria.
-function conectarComoNavegador() {
+// Abre uma conexão com um Origin específico, sem chegar ao handshake do
+// pareamento — só interessa saber se o verifyClient deixou passar.
+function conectarComOrigin(origin) {
   return new Promise((pronto) => {
-    const c = new WebSocket(`ws://127.0.0.1:${PORTA_TESTE}`, {
-      origin: "https://site-qualquer.exemplo",
-    });
+    const c = new WebSocket(`ws://127.0.0.1:${PORTA_TESTE}`, { origin });
     c.on("open", () => {
       c.close();
       pronto({ aceito: true });
@@ -182,11 +181,28 @@ async function rodar() {
     appAntigo.reason
   );
 
-  const navegador = await conectarComoNavegador();
+  const terceiro = await conectarComOrigin("https://site-qualquer.exemplo");
   verificar(
-    "conexão vinda de um navegador (com Origin) é recusada",
-    navegador.aceito === false,
-    navegador.erro
+    "Origin de outro site (navegador) é recusado",
+    terceiro.aceito === false,
+    terceiro.erro
+  );
+
+  // O React Native manda Origin sempre, derivado da propria URL do WebSocket.
+  // Recusar pela simples presenca do cabecalho barrava o tablet de verdade —
+  // este caso existe para essa regressao nao voltar.
+  const appNativo = await conectarComOrigin(`http://127.0.0.1:${PORTA_TESTE}`);
+  verificar(
+    "Origin do proprio servidor (React Native) e aceito",
+    appNativo.aceito === true,
+    appNativo.erro
+  );
+
+  const semOrigin = await conectarComOrigin(undefined);
+  verificar(
+    "conexao sem Origin e aceita",
+    semOrigin.aceito === true,
+    semOrigin.erro
   );
 
   const falhas = resultados.filter((r) => !r.ok);
