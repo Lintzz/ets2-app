@@ -15,7 +15,8 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0F1014"
+        "monochromeImage": "./assets/monochrome-icon.png",
+        "backgroundColor": "#0B0B0B"
       },
       "package": "com.lintz.ets2dashboard"
     },
