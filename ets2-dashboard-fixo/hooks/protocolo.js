@@ -1,4 +1,4 @@
-// ETS2_DashboardFixo/hooks/protocolo.js
+// Dashlz app/hooks/protocolo.js
 // Espelha ets2-servidor/protocolo.js. Se mudar um lado, mude o outro.
 
 // 3: pareamento por código + desafio-resposta. Contra um servidor da versão 2

@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:"
     />
-    <title>ETS2 Dashboard Server Status</title>
+    <title>Dashlz</title>
     <!--
       Tudo é local de propósito: a versão anterior carregava o Tailwind por CDN,
       e o app abria sem nenhum estilo quando o PC estava sem internet — que é
@@ -205,18 +205,31 @@
 
       .lateral {
         border-right: 1px solid var(--borda-sutil);
-        padding: 18px 16px;
+        padding: 16px 14px;
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 14px;
         background: rgba(8, 11, 12, 0.6);
         min-height: 0;
+        overflow: hidden;
+      }
+
+      /* Só esta parte rola. Sem isso, "Esquecer aparelho" era empurrado para
+         fora da janela na altura mínima (560px) e ficava colado na borda. */
+      .lateral-rolagem {
+        flex: 1;
+        min-height: 0;
         overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        /* espaço para a barra de rolagem não encostar nos cartões */
+        padding-right: 2px;
       }
 
       .conteudo {
         display: grid;
-        grid-template-rows: auto 1fr;
+        grid-template-rows: auto auto 1fr;
         gap: 16px;
         padding: 18px 20px;
         min-height: 0;
@@ -313,7 +326,7 @@
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        padding: 9px 10px;
+        padding: 8px 10px;
         border-radius: 7px;
         border: 1px solid transparent;
       }
@@ -348,16 +361,16 @@
       /* Só aparece enquanto não há aparelho pareado. É o que autoriza o tablet
          a conectar, então tem que ser a coisa mais legível da janela. */
       #painel-codigo {
-        padding: 14px 16px;
+        padding: 13px 16px;
         text-align: center;
         flex-shrink: 0;
         border-color: oklch(0.75 0.18 145 / 0.45);
       }
 
       #codigo-valor {
-        margin-top: 10px;
+        margin-top: 8px;
         font-family: var(--mono);
-        font-size: 34px;
+        font-size: 31px;
         font-weight: 700;
         letter-spacing: 0.22em;
         text-indent: 0.22em; /* compensa o espaço extra depois do último dígito */
@@ -372,7 +385,7 @@
       }
 
       #codigo-novo {
-        margin-top: 12px;
+        margin-top: 10px;
         width: 100%;
         border: 1px solid #1e2629;
         border-radius: 7px;
@@ -393,17 +406,18 @@
       /* --- Ações --- */
 
       .acoes {
-        margin-top: auto;
+        flex-shrink: 0;
         display: flex;
         flex-direction: column;
         gap: 8px;
-        padding-top: 8px;
+        padding-top: 14px;
+        border-top: 1px solid var(--borda-sutil);
       }
 
       button.acao {
         border: 0;
         border-radius: 8px;
-        padding: 13px;
+        padding: 12px;
         font-family: inherit;
         font-size: 13px;
         letter-spacing: 0.1em;
@@ -535,6 +549,57 @@
       button.mini:disabled {
         opacity: 0.4;
         cursor: default;
+      }
+
+      /* --- Instalar no tablet (QR do APK) --- */
+
+      #apk-panel {
+        padding: 16px 18px;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 18px;
+      }
+
+      /* O QR nasce com fundo branco: é o que a câmera espera. A moldura clara
+         evita que ele pareça um recorte colado sobre o painel escuro. */
+      #apk-qr {
+        width: 116px;
+        height: 116px;
+        border-radius: 8px;
+        background: #fff;
+        padding: 6px;
+        flex-shrink: 0;
+      }
+      #apk-qr[hidden] {
+        display: none;
+      }
+
+      .apk-info {
+        min-width: 0;
+      }
+
+      #apk-estado {
+        margin-top: 9px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      #apk-detalhe {
+        margin-top: 6px;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+      #apk-detalhe .fonte {
+        color: var(--verde);
+        font-weight: 600;
+      }
+
+      .apk-botoes {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
       }
 
       /* --- Log --- */
@@ -669,6 +734,9 @@
           padding: 14px 12px;
           gap: 12px;
         }
+        .lateral-rolagem {
+          gap: 12px;
+        }
         .conteudo {
           padding: 14px;
           gap: 12px;
@@ -687,6 +755,14 @@
           grid-template-columns: minmax(0, 1fr);
           gap: 12px;
         }
+        #apk-panel {
+          gap: 14px;
+          padding: 14px;
+        }
+        #apk-qr {
+          width: 96px;
+          height: 96px;
+        }
         .plugin-botoes {
           justify-content: flex-start;
         }
@@ -702,7 +778,7 @@
     <header>
       <div class="titulo">
         <span class="marca"></span>
-        <span class="nome">ETS2 Server Status</span>
+        <span class="nome">Dashlz</span>
         <span id="app-versao"></span>
       </div>
 
@@ -731,41 +807,43 @@
 
     <main>
       <div class="lateral">
-        <div id="main-status-panel" class="cartao">
-          <div class="status-topo">
-            <span id="status-dot"></span>
-            <span class="rotulo">Status do servidor</span>
+        <div class="lateral-rolagem">
+          <div id="main-status-panel" class="cartao">
+            <div class="status-topo">
+              <span id="status-dot"></span>
+              <span class="rotulo">Status do servidor</span>
+            </div>
+            <span id="status-text">Iniciando...</span>
+            <span id="uptime">uptime 00:00:00</span>
+            <div class="varredura"></div>
           </div>
-          <span id="status-text">Iniciando...</span>
-          <span id="uptime">uptime 00:00:00</span>
-          <div class="varredura"></div>
-        </div>
 
-        <div class="conexao">
-          <div class="rotulo">Conexão</div>
-          <div class="linha">
-            <b>IP do servidor</b>
-            <span id="ip-text" class="valor">Aguardando...</span>
+          <div class="conexao">
+            <div class="rotulo">Conexão</div>
+            <div class="linha">
+              <b>IP do servidor</b>
+              <span id="ip-text" class="valor">Aguardando...</span>
+            </div>
+            <div class="linha">
+              <b>Outros endereços</b>
+              <span id="ips-text" class="valor neutro">—</span>
+            </div>
+            <div class="linha">
+              <b>Cliente conectado</b>
+              <span id="client-text" class="valor apagado">Nenhum</span>
+            </div>
+            <div class="linha">
+              <b>Aparelho pareado</b>
+              <span id="paired-text" class="valor neutro">Nenhum</span>
+            </div>
           </div>
-          <div class="linha">
-            <b>Outros endereços</b>
-            <span id="ips-text" class="valor neutro">—</span>
-          </div>
-          <div class="linha">
-            <b>Cliente conectado</b>
-            <span id="client-text" class="valor apagado">Nenhum</span>
-          </div>
-          <div class="linha">
-            <b>Aparelho pareado</b>
-            <span id="paired-text" class="valor neutro">Nenhum</span>
-          </div>
-        </div>
 
-        <div id="painel-codigo" class="cartao" hidden>
-          <div class="rotulo">Código de pareamento</div>
-          <div id="codigo-valor">------</div>
-          <div id="codigo-prazo">—</div>
-          <button id="codigo-novo">Gerar outro código</button>
+          <div id="painel-codigo" class="cartao" hidden>
+            <div class="rotulo">Código de pareamento</div>
+            <div id="codigo-valor">------</div>
+            <div id="codigo-prazo">—</div>
+            <button id="codigo-novo">Gerar outro código</button>
+          </div>
         </div>
 
         <div class="acoes">
@@ -790,6 +868,19 @@
           </div>
         </div>
 
+        <div id="apk-panel" class="cartao">
+          <img id="apk-qr" alt="QR code para baixar o aplicativo" hidden />
+          <div class="apk-info">
+            <div class="rotulo">Instalar no tablet</div>
+            <div id="apk-estado">Procurando o aplicativo...</div>
+            <div id="apk-detalhe">—</div>
+            <div class="apk-botoes">
+              <button id="apk-verificar-btn" class="mini">Verificar</button>
+              <button id="apk-pagina-btn" class="mini">Abrir no navegador</button>
+            </div>
+          </div>
+        </div>
+
         <div class="log-wrap">
           <div class="log-topo">
             <div class="esquerda">
@@ -807,7 +898,7 @@
     </main>
 
     <footer>
-      <span>Dashboard Server · Electron</span>
+      <span>Dashlz · Electron</span>
       <span class="estado"><span id="footer-dot"></span><span id="footer-status">Iniciando...</span></span>
     </footer>
 

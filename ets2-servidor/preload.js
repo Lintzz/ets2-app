@@ -1,4 +1,4 @@
-// ETS2_Servidor/preload.js
+// Dashlz servidor/preload.js
 // Ponte entre o processo principal e a janela de status. Substitui o antigo
 // nodeIntegration:true / contextIsolation:false — a janela não tem mais acesso
 // direto ao Node, só a estes canais.
@@ -32,6 +32,13 @@ contextBridge.exposeInMainWorld("servidor", {
     instalar: () => ipcRenderer.invoke("plugin:instalar"),
     abrirPasta: () => ipcRenderer.invoke("plugin:abrir-pasta"),
     verificarAtualizacao: () => ipcRenderer.invoke("plugin:verificar-atualizacao"),
+  },
+
+  // APK do tablet: QR code da última release do aplicativo
+  apk: {
+    estado: () => ipcRenderer.invoke("apk:estado"),
+    verificar: () => ipcRenderer.invoke("apk:verificar"),
+    abrirPagina: () => ipcRenderer.invoke("apk:abrir-pagina"),
   },
 
   // Eventos

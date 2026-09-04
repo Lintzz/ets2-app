@@ -1,4 +1,4 @@
-// ETS2_Servidor/server.js
+// Dashlz servidor/server.js
 // Roda como processo filho de main.js (fork), conversa com o pai por process.send.
 
 const http = require("http");
@@ -60,7 +60,7 @@ const status = (message) => {
 };
 
 log("================================================");
-log("        SERVIDOR DO DASHBOARD ETS2 INICIADO");
+log("            DASHLZ · SERVIDOR INICIADO");
 log("================================================\n");
 
 // Sanidade do addon nativo: o fork @electron/node-gyp compila com clang-cl e

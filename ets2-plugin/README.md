@@ -1,18 +1,11 @@
-# :electric_plug: ETS2 Telemetry Plugin
+# :electric_plug: Dashlz — plugin
 
 > DLL em C++ carregada pelo Euro Truck Simulator 2. Registra os canais de
 > telemetria do SCS SDK 1.14 e escreve tudo numa região de memória compartilhada
 > do Windows.
 
-Parte do **[ETS2 Dashboard](../README.md)** — comece por lá para entender o
+Parte do **[Dashlz](../README.md)** — comece por lá para entender o
 conjunto e instalar. Este arquivo cobre só o que é desta pasta.
-
-## :clipboard: Tabela de Conteúdos
-- [Como este projeto se encaixa](#-como-este-projeto-se-encaixa)
-- [O que ele faz](#-o-que-ele-faz)
-- [Como compilar](#-como-compilar)
-
----
 
 ## :jigsaw: Como este projeto se encaixa
 
@@ -39,19 +32,12 @@ senão o servidor recusa a telemetria e avisa "plugin desatualizado".
 
 ## :rocket: Como compilar
 
-### Pré-requisitos
-Antes de começar, você vai precisar ter instalado na sua máquina o [Git](https://git-scm.com/) e o [Visual Studio](https://visualstudio.microsoft.com/) com a carga de trabalho de desenvolvimento para Desktop em C++.
-
-### Compilando e instalando no jogo
+Precisa do [Visual Studio](https://visualstudio.microsoft.com/) com a carga de
+trabalho de desenvolvimento para Desktop em C++. Não há script de build por
+linha de comando — a compilação é pela IDE.
 
 ```bash
-# Clone este repositório
-$ git clone https://github.com/Lintzz/ets2-app.git
-
-# Acesse a pasta do projeto no terminal
-$ cd ets2-app/ets2-plugin/PluginETS2
-
-# Abra a solução no Visual Studio
+$ cd ets2-plugin/PluginETS2
 $ start PluginETS2.sln
 ```
 
@@ -65,12 +51,5 @@ $ start PluginETS2.sln
 
 ---
 
-## :page_facing_up: Licença
-Este projeto está sob a licença MIT.
-
----
-
-## :email: Contato
-Alexandre Lintz - [alexandrelintz.1999@gmail.com](mailto:alexandrelintz.1999@gmail.com)
-
-GitHub: [Lintzz](https://github.com/Lintzz)
+Licença [MIT](./LICENSE). Contato e visão geral no
+[README da raiz](../README.md).

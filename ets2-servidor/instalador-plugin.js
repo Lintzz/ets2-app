@@ -1,4 +1,4 @@
-// ETS2_Servidor/instalador-plugin.js
+// Dashlz servidor/instalador-plugin.js
 // Detecta a instalação do Euro Truck Simulator 2 e instala o PluginETS2.dll na
 // pasta de plugins do jogo (criando-a se não existir).
 

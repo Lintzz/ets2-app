@@ -1,4 +1,4 @@
-// ETS2_Servidor/registro.js
+// Dashlz servidor/registro.js
 // Grava em arquivo tudo o que aparece no log da janela.
 //
 // Sem isto, "o app não conecta" é insolúvel à distância: a janela mostra o log
@@ -66,7 +66,7 @@ function iniciar(userData, versao) {
     fs.mkdirSync(pasta, { recursive: true });
     abrir();
     escrever(
-      `===== ETS2 Servidor ${versao || ""} iniciado em ` +
+      `===== Dashlz ${versao || ""} iniciado em ` +
         `${new Date().toLocaleString()} (${process.platform}, node ${process.versions.node}) =====`
     );
   } catch {

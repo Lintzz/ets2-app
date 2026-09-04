@@ -1,4 +1,4 @@
-// ETS2_Servidor/status_renderer.js
+// Dashlz servidor/status_renderer.js
 // Roda no processo de renderização, sem acesso ao Node: tudo passa pela API
 // exposta em preload.js como window.servidor.
 
@@ -340,6 +340,56 @@ btnVerificar.addEventListener("click", async () => {
 btnAbrir.addEventListener("click", () => window.servidor.plugin.abrirPasta());
 
 atualizarPlugin();
+
+// --- Instalar no tablet (QR do APK) ---
+
+const apkQr = document.getElementById("apk-qr");
+const apkEstado = document.getElementById("apk-estado");
+const apkDetalhe = document.getElementById("apk-detalhe");
+const btnApkVerificar = document.getElementById("apk-verificar-btn");
+const btnApkPagina = document.getElementById("apk-pagina-btn");
+
+const emMegabytes = (bytes) => (bytes / 1024 / 1024).toFixed(0);
+
+function pintarApk(estado) {
+  if (!estado || !estado.disponivel) {
+    apkQr.hidden = true;
+    apkQr.removeAttribute("src");
+    apkEstado.textContent = "APK não encontrado";
+    apkDetalhe.textContent =
+      (estado && estado.motivo) || "Sem conexão com o GitHub.";
+    return;
+  }
+
+  // src só é trocado com o data URI que o processo principal gerou; o renderer
+  // nunca monta markup a partir dele.
+  apkQr.src = estado.qr;
+  apkQr.hidden = false;
+
+  apkEstado.textContent = "Aponte a câmera do tablet para o código";
+  apkDetalhe.innerHTML =
+    `Aplicativo <span class="fonte">${estado.versao}</span> · ${emMegabytes(estado.tamanho)} MB · ` +
+    "o download abre no navegador do aparelho";
+}
+
+async function atualizarApk() {
+  pintarApk(await window.servidor.apk.estado());
+}
+
+btnApkVerificar.addEventListener("click", async () => {
+  btnApkVerificar.disabled = true;
+  apkDetalhe.textContent = "Consultando o GitHub...";
+
+  const estado = await window.servidor.apk.verificar();
+  pintarApk(estado);
+  addLog(`Aplicativo: ${estado.motivo}`);
+
+  btnApkVerificar.disabled = false;
+});
+
+btnApkPagina.addEventListener("click", () => window.servidor.apk.abrirPagina());
+
+atualizarApk();
 
 window.servidor.versao().then((v) => {
   appVersao.textContent = `v${v}`;

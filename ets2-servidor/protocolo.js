@@ -1,4 +1,4 @@
-// ETS2_Servidor/protocolo.js
+// Dashlz servidor/protocolo.js
 // Constantes compartilhadas entre o servidor e o app. Se algo aqui mudar, o
 // mesmo valor precisa mudar em ets2-dashboard-fixo/hooks/protocolo.js.
 

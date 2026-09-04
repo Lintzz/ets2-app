@@ -53,7 +53,7 @@ ETS2 game process
        ↓
   Win32 shared memory, name L"MeuDashboardETS2_Full"
        ↓  read every 50 ms (20 Hz)
-  ETS2 Servidor (Electron)
+  Dashlz servidor (Electron)
     main.js    tray + frameless status.html window; fork()s server.js
                (contextIsolation + preload.js; no nodeIntegration)
     server.js  (child process, talks to main.js only via process.send)
@@ -181,13 +181,37 @@ publishing a new `plugin-vX.Y.Z` release is enough. Resolution is cached per run
 The fallback DLL ships from `recursos/PluginETS2.dll` (committed) and reaches the
 packaged app through `packagerConfig.extraResource`, so at runtime it is
 `process.resourcesPath/PluginETS2.dll` when `app.isPackaged`, else
-`__dirname/recursos/`. Note `userData` is `%APPDATA%\ets2_servidor` (from
-package.json `name`), not the packager's display name. The chosen game folder is remembered in
+`__dirname/recursos/`. Note `userData` is `%APPDATA%\dashlz` (from
+package.json `name`), not the packager's display name. It was `ets2_servidor`
+until the rename to Dashlz, so an install from before that starts with no
+`config.json` and no pairing. The chosen game folder is remembered in
 `config.json` under Electron's `userData`. UI lives in the "Plugin no jogo"
 panel of `status.html`; IPC uses `ipcMain.handle("plugin:*")`.
 
 **After changing `main.cpp`, rebuild the DLL and refresh `recursos/PluginETS2.dll`** —
 otherwise the app ships the old schema and the server refuses the telemetry.
+
+## Getting the APK onto the tablet
+
+The "Instalar no tablet" card in `status.html` shows a QR code that points at the
+`.apk` of the newest `app-vX.Y.Z` release. `app-remoto.js` resolves it the same way
+`plugin-remoto.js` resolves the DLL — list `/releases`, take the first non-draft
+one whose tag carries the prefix, never `/releases/latest` — with one difference:
+the asset is matched by the `.apk` **extension**, not by an exact filename, because
+the published asset is named by Expo (`2.-.ETS2.Dashboard.1.2.0.apk`) rather than
+by us.
+
+The QR encodes the GitHub URL, so the tablet needs its own internet. Serving the
+file from the server itself was considered and dropped: it would mean caching
+~75 MB in `userData` and opening a new public HTTP route, to cover only a tablet
+on a LAN with no internet at all.
+
+`gerarQr()` produces **SVG** (the window resizes; a PNG would blur) and hands it
+over IPC as a `data:` URI, which the renderer assigns to `img.src` — no markup
+crosses the `contextIsolation` boundary. That URI only renders because the CSP in
+`status.html` carries `img-src 'self' data:`; without it the image is silently
+blocked and the panel shows nothing but its alt text. Resolution is cached per
+run, like the plugin's; the **Verificar** button forces a re-check.
 
 ## Discovery and pairing
 
@@ -253,16 +277,25 @@ preference — it depends on whether the platform applies its own mask.
 |---|---|---|---|
 | Windows exe + tray | `ets2-servidor/icon.ico` | rounded | Windows never masks; a square would be a hard black block |
 | Android legacy / stores | `assets/icon.png` | rounded | used as-is by old launchers |
-| Android adaptive fg | `assets/adaptive-icon.png` | **recomposed** | the system masks it — see below |
+| Android adaptive fg | `assets/adaptive-icon.png` | rounded, **scaled down** | the system masks it — see below |
 | Android themed | `assets/monochrome-icon.png` | same as adaptive | Android 13+ tints it |
 | Splash | `assets/splash-icon.png` | artwork only, transparent | floats on the splash background |
 
-The adaptive foreground is **not** either master. An adaptive icon only
-guarantees a central circle of 66/108 of the canvas, and the "Lz" sitting in the
-bottom-right corner of the master is clipped by every circular mask (the Pixel
-launcher's). So the foreground is recomposed: the gauge centred, the "Lz" moved
-into the gauge's open bottom, everything inside the safe circle. Masters live in
-`ets2-dashboard-fixo/extras/icone/` and `ets2-servidor/icon-fonte-1024.png`.
+The adaptive foreground carries the master's artwork **unchanged in
+composition** — the gauge plus the "Lz" in its bottom-right corner, exactly the
+arrangement the Windows tray shows — only scaled down so nothing is clipped. An
+adaptive icon guarantees just a central circle of 66/108 of the canvas, and the
+artwork's outermost pixels sit at the corners of its own bounding box, so the
+enclosing radius is what fixes the size: on a 1024 canvas the art lands at
+**444 px**, 43% of it. At full size the "Lz" is eaten by every circular mask (the
+Pixel launcher's); at 485 px it touches the 72/108 mask edge, which the launcher
+scale animations can still cross. The dark plate is not painted into the
+foreground — `adaptiveIcon.backgroundColor` `#0B0B0B` in `app.json` is the
+background layer and the mask gives it its shape. An earlier version recomposed
+the artwork instead (gauge centred, "Lz" moved into the gauge's open bottom) to
+buy size; that was dropped so the phone and the tray show the same mark. Masters
+live in `ets2-dashboard-fixo/extras/icone/` and
+`ets2-servidor/icon-fonte-1024.png`.
 
 Regenerating (ImageMagick 7). First lift the artwork off its plate — the master's
 background is `#0B0B0B`, not pure black, so the `-level` is what stops a 4% grey
@@ -274,8 +307,17 @@ magick "lz-icon-1024-quadrado.png" -alpha off -colorspace sRGB \
   -fill white -colorize 100 -colorspace sRGB arte.png
 ```
 
-Then split `arte.png` into the gauge and the wordmark, and recompose at
-620 px / 112 px with the wordmark at `+0+172` from centre. For `icon.ico`, sizes
+Then square `arte.png` on its own bounding box and scale it to 444 px on a
+transparent 1024 canvas. That is `adaptive-icon.png` and `monochrome-icon.png`,
+byte for byte the same file:
+
+```bash
+magick arte.png -trim +repage -background none -gravity center -extent 777x777 \
+  -resize 444x444 -extent 1024x1024 -colorspace sRGB -type TrueColorAlpha \
+  PNG32:adaptive-icon.png
+```
+
+For `icon.ico`, sizes
 16/24/32 get `-channel RGB -level 0%,72%` before packing: the 1 px arc turns mid
 grey in a plain downscale and the tray icon comes out muddy.
 

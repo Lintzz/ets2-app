@@ -1,4 +1,4 @@
-// ETS2_DashboardFixo/screens/ConexaoScreen.js
+// Dashlz app/screens/ConexaoScreen.js
 // Tela mostrada enquanto não há telemetria. Além do status da busca, oferece a
 // entrada manual do IP — a saída garantida para qualquer rede que a varredura
 // automática não cubra (sub-rede diferente, /16, Wi-Fi com isolamento de

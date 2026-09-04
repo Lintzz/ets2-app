@@ -1,4 +1,4 @@
-// ETS2_Servidor/atualizador.js
+// Dashlz servidor/atualizador.js
 // Atualização automática do próprio servidor, via Squirrel.Windows.
 //
 // Sem isto, atualizar significa "baixe o instalador de novo e rode" — coisa que

@@ -1,19 +1,11 @@
-# :satellite: ETS2 Servidor
+# :satellite: Dashlz — servidor
 
 > Aplicativo Electron que roda no PC: lê a telemetria da memória compartilhada
 > pelo plugin e a transmite ao tablet por WebSocket, devolvendo os comandos ao
 > teclado do jogo.
 
-Parte do **[ETS2 Dashboard](../README.md)** — comece por lá para entender o
+Parte do **[Dashlz](../README.md)** — comece por lá para entender o
 conjunto, instalar e parear. Este arquivo cobre só o que é desta pasta.
-
-## :clipboard: Tabela de Conteúdos
-- [Como este projeto se encaixa](#-como-este-projeto-se-encaixa)
-- [O que ele faz](#-o-que-ele-faz)
-- [Como rodar](#-como-rodar)
-- [Instalando o plugin no jogo](#-instalando-o-plugin-no-jogo)
-
----
 
 ## :jigsaw: Como este projeto se encaixa
 
@@ -32,26 +24,21 @@ O desenho completo, o pareamento e o modelo de segurança estão no
 - [x] **Transmissão WebSocket:** Envio contínuo e rápido dos dados do jogo para clientes conectados.
 - [x] **Autodescoberta de Rede:** o app varre a própria sub-rede e identifica o servidor pelo endpoint `GET /ets2`; funciona por Wi-Fi comum, sem depender de broadcast. (O responder UDP na porta 48888 continua ativo por compatibilidade.)
 - [x] **Controle Remoto de Teclas:** comandos remotos via RobotJS, restritos a uma allowlist de teclas — nenhum cliente consegue digitar texto arbitrário no PC.
-- [x] **Pareamento de Aparelho:** o primeiro tablet que conecta é memorizado; os demais são recusados até você clicar em "Esquecer aparelho".
-- [x] **Firewall Automático:** cria as regras de entrada para TCP 3000 e UDP 48888 em todos os perfis de rede (o motivo mais comum de funcionar no cabo e não no Wi-Fi).
+- [x] **Pareamento por Código:** o tablet só entra digitando os 6 dígitos mostrados na janela do servidor — uso único, validade de 10 minutos. No pareamento o servidor sorteia um segredo de 32 bytes e o entrega uma vez só; depois disso a autenticação é por desafio-resposta, e o segredo nunca mais trafega. Um aparelho por vez, até você clicar em "Esquecer aparelho".
+- [x] **Firewall Automático:** cria as regras de entrada para TCP 3000 e UDP 48888 nos perfis **Particular e Domínio** — rede Pública fica de fora de propósito, para não deixar a porta aberta no Wi-Fi de hotel ou cafeteria. Rede marcada como Pública no Windows é a causa mais comum de "não conecta".
 - [x] **Instalação do Plugin pelo App:** detecta a pasta do ETS2 automaticamente (lê as bibliotecas do Steam), cria a pasta `plugins` e instala a DLL — com backup da versão anterior. A DLL vem da **última release de [ets2-plugin](https://github.com/Lintzz/ets2-app/releases)**, então o plugin fica sempre em dia sem precisar reinstalar o servidor; sem internet, usa a cópia que acompanha o instalador.
+- [x] **QR Code do Aplicativo:** o painel "Instalar no tablet" mostra um QR com o link do `.apk` da última release `app-vX.Y.Z` — a câmera do tablet abre o download direto, sem cabo nem digitar URL. Precisa de internet no aparelho; sem rede no PC, o painel avisa e o botão "Abrir no navegador" leva à página da release.
 - [x] **Interface Oculta e Tray:** Aplicação Electron com janela customizada e suporte a modo silencioso no System Tray.
 
 ---
 
 ## :rocket: Como Rodar
 
-### Pré-requisitos
-Antes de começar, você vai precisar ter instalado na sua máquina o [Node.js](https://nodejs.org/en/) e o [Git](https://git-scm.com/). Como o projeto inclui um módulo nativo em C++, você também precisará do **Node-Gyp** e das ferramentas de build correspondentes (Visual Studio Build Tools no Windows).
-
-### Gerando a Build (Instalação)
+Precisa do [Node.js](https://nodejs.org/en/) e, por causa do módulo nativo em
+C++, das Visual Studio Build Tools com a workload de C++.
 
 ```bash
-# Clone este repositório
-$ git clone https://github.com/Lintzz/ets2-app.git
-
-# Acesse a pasta do projeto no terminal
-$ cd ets2-app/ets2-servidor
+$ cd ets2-servidor
 
 # Instale as dependências e compile o addon nativo
 $ npm install
@@ -72,7 +59,7 @@ $ npm run make
 
 ## :jigsaw: Instalando o plugin no jogo
 
-Não precisa copiar DLL na mão. Abra o **ETS2 Servidor** e use o painel **"Plugin no jogo"**:
+Não precisa copiar DLL na mão. Abra o **Dashlz** e use o painel **"Plugin no jogo"**:
 
 1. O app procura a instalação do ETS2 sozinho (registro do Steam + `libraryfolders.vdf`, então acha o jogo mesmo em outro HD). Se não achar, clique em **Escolher pasta** e aponte para a raiz do *Euro Truck Simulator 2*.
 2. Clique em **Instalar plugin**. A pasta `bin\win_x64\plugins` é criada se não existir, e uma DLL já presente é preservada como `PluginETS2.dll.bak`.
@@ -90,12 +77,5 @@ Se o GitHub estiver fora do ar, sem internet, ou se o download vier corrompido, 
 
 ---
 
-## :page_facing_up: Licença
-Este projeto está sob a licença [MIT](./LICENSE).
-
----
-
-## :mailbox_with_mail: Contato
-Alexandre Lintz - [alexandrelintz.1999@gmail.com](mailto:alexandrelintz.1999@gmail.com)
-
-GitHub: [Lintzz](https://github.com/Lintzz)
+Licença [MIT](./LICENSE). Contato e visão geral no
+[README da raiz](../README.md).

@@ -10,6 +10,7 @@ const {
   statusInstalacao,
 } = require("./instalador-plugin");
 const { melhorDllDisponivel } = require("./plugin-remoto");
+const { estadoDoApk } = require("./app-remoto");
 const registro = require("./registro");
 const { iniciarAtualizacoes } = require("./atualizador");
 
@@ -74,7 +75,7 @@ function createMainWindow() {
     height: 720,
     minWidth: 820,
     minHeight: 560,
-    title: "ETS2 Server Status",
+    title: "Dashlz",
     // Empacotado o ícone vem do .exe, mas em desenvolvimento a janela ficava
     // com o ícone padrão do Electron na barra de tarefas.
     icon: path.join(__dirname, process.platform === "win32" ? "icon.ico" : "icon.png"),
@@ -226,7 +227,7 @@ app.whenReady().then(() => {
     { label: "Sair", click: () => app.quit() },
   ]);
 
-  tray.setToolTip("Servidor do Dashboard ETS2");
+  tray.setToolTip("Dashlz — servidor do dashboard");
   tray.setContextMenu(contextMenu);
 });
 
@@ -412,6 +413,31 @@ ipcMain.handle("plugin:instalar", async () => {
 ipcMain.handle("plugin:verificar-atualizacao", () =>
   estadoDoPlugin({ forcarNovaBusca: true })
 );
+
+// --- HANDLERS IPC DO APK DO TABLET ---
+
+// Resolvido uma vez por execução, como a DLL: quem abre a janela toda hora não
+// precisa de uma consulta nova ao GitHub a cada vez.
+let apkResolvido = null;
+
+async function apkDoTablet({ forcarNovaBusca = false } = {}) {
+  if (apkResolvido && !forcarNovaBusca) return apkResolvido;
+
+  apkResolvido = await estadoDoApk();
+  sendLogToWindow(`Aplicativo: ${apkResolvido.motivo}`);
+  return apkResolvido;
+}
+
+ipcMain.handle("apk:estado", () => apkDoTablet());
+
+ipcMain.handle("apk:verificar", () => apkDoTablet({ forcarNovaBusca: true }));
+
+// Abre a página da release no navegador do PC — a saída para quem prefere
+// baixar por aqui e passar o arquivo por cabo.
+ipcMain.handle("apk:abrir-pagina", async () => {
+  const apk = await apkDoTablet();
+  if (apk.pagina) await shell.openExternal(apk.pagina);
+});
 
 ipcMain.handle("plugin:abrir-pasta", async () => {
   const pasta = await pastaAtualDoJogo();

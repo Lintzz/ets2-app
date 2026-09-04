@@ -1,4 +1,4 @@
-// ETS2_Servidor/scripts/build-addon.js
+// Dashlz servidor/scripts/build-addon.js
 // Compila leitor_memoria.node com o node-gyp OFICIAL.
 //
 // Por que não deixar o npm chamar `node-gyp rebuild` sozinho: o Electron Forge

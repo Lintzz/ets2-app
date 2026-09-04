@@ -1,18 +1,10 @@
-# :bar_chart: ETS2 Dashboard Fixo
+# :bar_chart: Dashlz — app
 
 > Aplicativo Expo / React Native que transforma um tablet Android no painel do
 > caminhão: telemetria a 20 Hz e botões que acionam os comandos do jogo.
 
-Parte do **[ETS2 Dashboard](../README.md)** — comece por lá para entender o
+Parte do **[Dashlz](../README.md)** — comece por lá para entender o
 conjunto, instalar e parear. Este arquivo cobre só o que é desta pasta.
-
-## :clipboard: Tabela de Conteúdos
-- [Como este projeto se encaixa](#-como-este-projeto-se-encaixa)
-- [O que ele faz](#-o-que-ele-faz)
-- [Como rodar](#-como-rodar)
-- [Gerando o APK localmente](#gerando-o-apk-localmente)
-
----
 
 ## :jigsaw: Como este projeto se encaixa
 
@@ -30,24 +22,18 @@ lado, mude o outro.
 - [x] Conexão direta com dados de telemetria (WebSocket, ~20 Hz)
 - [x] Descoberta automática do servidor pelo Wi-Fi, varrendo a própria sub-rede — sem precisar de cabo nem digitar IP
 - [x] Entrada manual de IP como alternativa, para redes onde a varredura não alcança
-- [x] Biblioteca de Widgets customizáveis
+- [x] Catálogo de 77 widgets (`WidgetLibrary.js`) num layout fixo — as 88 posições vivem em `INITIAL_WIDGETS`, e o editor visual que gerou os `id`s não faz parte deste repositório
 - [x] Renderização avançada e dinâmica de ícones em SVG
 
 ---
 
 ## :rocket: Como Rodar
 
-### Pré-requisitos
-Antes de começar, você vai precisar ter instalado na sua máquina o [Node.js](https://nodejs.org/en/) e o [Git](https://git-scm.com/). Além disso, precisará do [Expo CLI](https://docs.expo.dev/get-started/installation/) e de um dispositivo Android com um development build instalado (o Expo Go não serve, veja abaixo).
-
-### Instalação e Execução
+Precisa do [Node.js](https://nodejs.org/en/) e de um aparelho Android com um
+development build instalado — o Expo Go não serve, veja o aviso abaixo.
 
 ```bash
-# Clone este repositório
-$ git clone https://github.com/Lintzz/ets2-app.git
-
-# Acesse a pasta do projeto no terminal
-$ cd ets2-app/ets2-dashboard-fixo
+$ cd ets2-dashboard-fixo
 
 # Instale as dependências
 $ npm install
@@ -87,12 +73,5 @@ não conecta — está no [README da raiz](../README.md#-parear-o-tablet).
 
 ---
 
-## :page_facing_up: Licença
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
-
----
-
-## :email: Contato
-Alexandre Lintz - [alexandrelintz.1999@gmail.com](mailto:alexandrelintz.1999@gmail.com)
-
-GitHub: [Lintzz](https://github.com/Lintzz)
+Licença [MIT](./LICENSE). Contato e visão geral no
+[README da raiz](../README.md).

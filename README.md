@@ -1,4 +1,4 @@
-# :truck: ETS2 Dashboard
+# :truck: Dashlz
 
 <p align="center">
   <img src="https://img.shields.io/badge/C%2B%2B-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white" alt="C++" />
@@ -43,11 +43,11 @@ Euro Truck Simulator 2
        lê ~55 canais de telemetria pelo SCS SDK e escreve
        numa região de memória compartilhada do Windows
        ↓
-  ETS2 Servidor (Electron, na bandeja) ......... ets2-servidor/
+  Dashlz servidor (Electron, na bandeja) ....... ets2-servidor/
        lê essa memória 20x por segundo, serve um WebSocket
        na porta 3000 e devolve os comandos ao teclado do jogo
        ↓  Wi-Fi
-  ETS2 Dashboard (Android) ..................... ets2-dashboard-fixo/
+  Dashlz app (Android) ......................... ets2-dashboard-fixo/
        acha o servidor sozinho na rede, desenha o painel
        e manda de volta o que você aperta
 ```
@@ -90,9 +90,14 @@ internet, ele usa a cópia que veio junto — a instalação nunca fica bloquead
 
 ### 3. O aplicativo, no tablet
 
-Baixe o `.apk` da release **`app-vX.Y.Z`**, copie para o aparelho e instale. O
-Android vai pedir permissão para "instalar app desconhecido" — é o normal para
-instalação fora da Play Store.
+Na janela do servidor, o painel **Instalar no tablet** mostra um QR code: aponte
+a câmera do tablet para ele e o download do `.apk` começa no navegador do
+aparelho. O Android vai pedir permissão para "instalar app desconhecido" — é o
+normal para instalação fora da Play Store.
+
+Se preferir, baixe o `.apk` da release **`app-vX.Y.Z`** direto da
+[página de releases](https://github.com/Lintzz/ets2-app/releases) e copie para o
+aparelho.
 
 > **Servidor e aplicativo precisam ser da mesma geração.** O protocolo de
 > pareamento mudou na versão 3; versões antigas são recusadas de propósito, com

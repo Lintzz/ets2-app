@@ -1,4 +1,4 @@
-// ETS2_Servidor/firewall.js
+// Dashlz servidor/firewall.js
 // Libera as portas do dashboard no Firewall do Windows.
 //
 // Este é o motivo mais comum de o app funcionar com o cabo (tethering) e não
@@ -18,8 +18,8 @@ const { DISCOVERY_PORT, TCP_PORT } = require("./protocolo");
 const PERFIS = "private,domain";
 
 const REGRAS = [
-  { nome: "ETS2 Dashboard (TCP)", protocolo: "TCP", porta: TCP_PORT },
-  { nome: "ETS2 Dashboard (UDP)", protocolo: "UDP", porta: DISCOVERY_PORT },
+  { nome: "Dashlz (TCP)", protocolo: "TCP", porta: TCP_PORT },
+  { nome: "Dashlz (UDP)", protocolo: "UDP", porta: DISCOVERY_PORT },
 ];
 
 const netsh = (args) =>

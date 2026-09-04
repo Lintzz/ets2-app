@@ -1,4 +1,4 @@
-// DashboardFixo/components/DashboardWidget.js
+// Dashlz app/components/DashboardWidget.js
 
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";

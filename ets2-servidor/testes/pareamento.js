@@ -1,4 +1,4 @@
-// ETS2_Servidor/testes/pareamento.js
+// Dashlz servidor/testes/pareamento.js
 // Exercita o handshake de pareamento de ponta a ponta, sem o jogo e sem o
 // Electron: sobe o server.js de verdade numa porta livre, com robotjs e o addon
 // nativo trocados por dublês, e checa cada caminho de aceite e de recusa.

@@ -1,4 +1,4 @@
-// ETS2_Servidor/plugin-remoto.js
+// Dashlz servidor/plugin-remoto.js
 //
 // Busca a PluginETS2.dll da release mais recente do plugin, para que o servidor
 // instale sempre a versão atual — e não a que estava embutida no dia em que este
@@ -37,7 +37,7 @@ async function buscarComTimeout(url, ms, extras = {}) {
     return await fetch(url, {
       signal: controle.signal,
       headers: {
-        "User-Agent": "ETS2-Servidor",
+        "User-Agent": "Dashlz",
         Accept: "application/vnd.github+json",
         ...extras.headers,
       },

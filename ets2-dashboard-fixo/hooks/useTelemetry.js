@@ -1,4 +1,4 @@
-// ETS2_DashboardFixo/hooks/useTelemetry.js
+// Dashlz app/hooks/useTelemetry.js
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Crypto from "expo-crypto";

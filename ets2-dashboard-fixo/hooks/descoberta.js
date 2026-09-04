@@ -1,4 +1,4 @@
-// ETS2_DashboardFixo/hooks/descoberta.js
+// Dashlz app/hooks/descoberta.js
 //
 // Descoberta do servidor por varredura HTTP da própria sub-rede.
 //
