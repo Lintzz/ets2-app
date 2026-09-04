@@ -82,6 +82,11 @@ document.getElementById("log-clear").addEventListener("click", () => {
   atualizarContagem();
 });
 
+// A janela mostra só a sessão atual; o arquivo guarda as anteriores.
+document.getElementById("log-abrir").addEventListener("click", () => {
+  window.servidor.abrirLogs();
+});
+
 function updateStatusDisplay(status) {
   statusText.textContent = status;
   footerStatus.textContent = status;
@@ -174,6 +179,58 @@ window.servidor.aoReceberInformacoes((info) => {
   clientText.classList.toggle("neutro", Boolean(info.clienteIp));
 
   pairedText.textContent = info.pareado ? info.pareado.nome : "Nenhum";
+
+  pintarCodigo(info);
+});
+
+// --- Código de pareamento ----------------------------------------------------
+
+const painelCodigo = document.getElementById("painel-codigo");
+const codigoValor = document.getElementById("codigo-valor");
+const codigoPrazo = document.getElementById("codigo-prazo");
+
+let expiraEm = null;
+
+// O painel só existe enquanto ninguém está pareado: depois disso o aparelho
+// entra provando o segredo, sem código nenhum.
+function pintarCodigo(info) {
+  const mostrar = Boolean(info.codigo) && !info.pareado;
+  painelCodigo.hidden = !mostrar;
+
+  if (!mostrar) {
+    expiraEm = null;
+    return;
+  }
+
+  codigoValor.textContent = info.codigo;
+  expiraEm = info.codigoExpiraEm || null;
+  pintarPrazo();
+}
+
+function pintarPrazo() {
+  if (painelCodigo.hidden) return;
+
+  if (!expiraEm) {
+    codigoPrazo.textContent = "Digite este código no aplicativo.";
+    return;
+  }
+
+  const restante = Math.max(0, Math.round((expiraEm - Date.now()) / 1000));
+
+  if (restante === 0) {
+    codigoPrazo.textContent = 'Código vencido — clique em "Gerar outro código".';
+    return;
+  }
+
+  const m = Math.floor(restante / 60);
+  const s = String(restante % 60).padStart(2, "0");
+  codigoPrazo.textContent = `Digite no aplicativo — vence em ${m}:${s}`;
+}
+
+setInterval(pintarPrazo, 1000);
+
+document.getElementById("codigo-novo").addEventListener("click", () => {
+  window.servidor.novoCodigo();
 });
 
 // --- Instalação do plugin no jogo ---

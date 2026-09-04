@@ -343,6 +343,53 @@
         color: #6e7d79;
       }
 
+      /* --- Código de pareamento --- */
+
+      /* Só aparece enquanto não há aparelho pareado. É o que autoriza o tablet
+         a conectar, então tem que ser a coisa mais legível da janela. */
+      #painel-codigo {
+        padding: 14px 16px;
+        text-align: center;
+        flex-shrink: 0;
+        border-color: oklch(0.75 0.18 145 / 0.45);
+      }
+
+      #codigo-valor {
+        margin-top: 10px;
+        font-family: var(--mono);
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-indent: 0.22em; /* compensa o espaço extra depois do último dígito */
+        color: var(--verde-forte);
+        text-shadow: 0 0 24px oklch(0.8 0.2 145 / 0.35);
+      }
+
+      #codigo-prazo {
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--muted-2);
+      }
+
+      #codigo-novo {
+        margin-top: 12px;
+        width: 100%;
+        border: 1px solid #1e2629;
+        border-radius: 7px;
+        padding: 8px;
+        font-family: inherit;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #9aa8a4;
+        background: var(--painel-2);
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
+      }
+      #codigo-novo:hover {
+        color: var(--texto);
+        border-color: #2c3639;
+      }
+
       /* --- Ações --- */
 
       .acoes {
@@ -529,7 +576,13 @@
         border-radius: 4px;
       }
 
-      #log-clear {
+      .log-acoes {
+        display: flex;
+        gap: 2px;
+      }
+
+      #log-clear,
+      #log-abrir {
         border: 0;
         background: transparent;
         font-family: inherit;
@@ -541,7 +594,8 @@
         cursor: pointer;
         transition: background 0.15s, color 0.15s;
       }
-      #log-clear:hover {
+      #log-clear:hover,
+      #log-abrir:hover {
         color: var(--texto);
         background: #161d20;
       }
@@ -707,6 +761,13 @@
           </div>
         </div>
 
+        <div id="painel-codigo" class="cartao" hidden>
+          <div class="rotulo">Código de pareamento</div>
+          <div id="codigo-valor">------</div>
+          <div id="codigo-prazo">—</div>
+          <button id="codigo-novo">Gerar outro código</button>
+        </div>
+
         <div class="acoes">
           <button id="restart-server-btn" class="acao">Reiniciar servidor</button>
           <button id="forget-device-btn" class="acao">Esquecer aparelho</button>
@@ -735,7 +796,10 @@
               <span class="rotulo">Log de eventos</span>
               <span id="log-count">0 linhas</span>
             </div>
-            <button id="log-clear">Limpar</button>
+            <div class="log-acoes">
+              <button id="log-abrir">Abrir arquivo</button>
+              <button id="log-clear">Limpar</button>
+            </div>
           </div>
           <div id="log-box"></div>
         </div>

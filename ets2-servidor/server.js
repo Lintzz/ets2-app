@@ -6,6 +6,7 @@ const dgram = require("dgram");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const crypto = require("crypto");
 const WebSocket = require("ws");
 const leitorMemoria = require("./build/Release/leitor_memoria");
 const robot = require("robotjs");
@@ -17,6 +18,12 @@ const {
   TCP_PORT,
   UDP_PROBE,
   UDP_ANNOUNCE,
+  CODIGO_DIGITOS,
+  CODIGO_VALIDADE_MS,
+  NONCE_BYTES,
+  SEGREDO_BYTES,
+  montarProva,
+  RECUSA,
   TECLAS_PERMITIDAS,
 } = require("./protocolo");
 
@@ -25,6 +32,11 @@ const {
 const TELEMETRIA_INTERVALO_MS = 50;
 const ANNOUNCE_INTERVALO_MS = 2000;
 const HELLO_TIMEOUT_MS = 5000;
+
+// Teto de comandos por segundo de um cliente já autenticado. O app real manda
+// no máximo um punhado por segundo (é um dedo apertando um botão); acima disso
+// é script. Passar do teto não derruba a conexão, só descarta o excesso.
+const LIMITE_COMANDOS_POR_S = 25;
 
 const ARQUIVO_PAREAMENTO = path.join(
   process.env.ETS2_USER_DATA || __dirname,
@@ -139,25 +151,39 @@ function enderecosParaBroadcast(enderecos) {
 }
 
 // --- Pareamento --------------------------------------------------------------
-// O primeiro aparelho que conectar é memorizado. Os outros são recusados até
-// alguém clicar em "Esquecer aparelho" na janela do servidor. Isso impede que
-// qualquer pessoa no mesmo Wi-Fi acione os comandos do seu jogo.
+// Só entra quem digitar, no app, o código de 6 dígitos mostrado na janela do
+// servidor. Aceitar o primeiro aparelho que aparecesse na rede (como era antes)
+// significava que um convidado no Wi-Fi — ou uma página web aberta no navegador
+// de qualquer máquina — podia virar o dono e digitar teclas no PC.
+//
+// No pareamento o servidor sorteia um segredo de 32 bytes e o entrega ao app uma
+// única vez. Depois disso o segredo nunca mais trafega: a cada conexão o
+// servidor manda um nonce e o app devolve SHA-256(nonce:segredo). Quem farejar a
+// rede vê só uma prova que não serve para o próximo nonce.
 
 function lerPareamento() {
   try {
     const bruto = fs.readFileSync(ARQUIVO_PAREAMENTO, "utf8");
     const dados = JSON.parse(bruto);
-    return dados && typeof dados.deviceId === "string" ? dados : null;
+    return dados && typeof dados.deviceId === "string" && typeof dados.segredo === "string"
+      ? dados
+      : null;
   } catch {
     return null;
   }
 }
 
-function salvarPareamento(deviceId, nome) {
+function salvarPareamento(deviceId, nome, segredo) {
   try {
     fs.writeFileSync(
       ARQUIVO_PAREAMENTO,
-      JSON.stringify({ deviceId, nome, pareadoEm: new Date().toISOString() }, null, 2)
+      JSON.stringify(
+        { deviceId, nome, segredo, pareadoEm: new Date().toISOString() },
+        null,
+        2
+      ),
+      // O arquivo guarda o segredo do aparelho: só o dono da conta lê.
+      { mode: 0o600 }
     );
     return true;
   } catch (e) {
@@ -172,7 +198,7 @@ function esquecerPareamento() {
   } catch {
     /* já não existia */
   }
-  log(">>> Pareamento apagado. O próximo aparelho que conectar será o novo. <<<");
+  log(">>> Pareamento apagado. <<<");
   for (const cliente of wss.clients) {
     try {
       cliente.close(4001, "pareamento-reiniciado");
@@ -181,9 +207,83 @@ function esquecerPareamento() {
     }
   }
   enviarAoPai({ type: "pareamento", pareado: null });
+  gerarCodigo();
+}
+
+// --- Código de pareamento ----------------------------------------------------
+
+// Só existe um código válido por vez, some assim que é usado e expira sozinho.
+let codigoAtual = null;
+
+function gerarCodigo() {
+  const maximo = 10 ** CODIGO_DIGITOS;
+  const valor = String(crypto.randomInt(0, maximo)).padStart(CODIGO_DIGITOS, "0");
+
+  codigoAtual = { valor, expiraEm: Date.now() + CODIGO_VALIDADE_MS };
+  log(`>>> Código de pareamento: ${valor} (vale ${CODIGO_VALIDADE_MS / 60000} min) <<<`);
+  enviarAoPai({ type: "codigo", codigo: valor, expiraEm: codigoAtual.expiraEm });
+
+  return codigoAtual;
+}
+
+function limparCodigo() {
+  codigoAtual = null;
+  enviarAoPai({ type: "codigo", codigo: null, expiraEm: null });
+}
+
+// Comparação em tempo constante, para não vazar quantos dígitos bateram.
+function iguaisEmTempoConstante(a, b) {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function codigoConfere(digitado) {
+  if (!codigoAtual) return false;
+  if (Date.now() > codigoAtual.expiraEm) {
+    limparCodigo();
+    return false;
+  }
+  return iguaisEmTempoConstante(codigoAtual.valor, digitado);
+}
+
+function provaConfere(nonce, segredo, provaRecebida) {
+  const esperada = crypto
+    .createHash("sha256")
+    .update(montarProva(nonce, segredo))
+    .digest("hex");
+  return iguaisEmTempoConstante(esperada, provaRecebida);
 }
 
 // --- Teclado -----------------------------------------------------------------
+
+// Janela deslizante de 1 s por conexão. Só avisa uma vez enquanto estourado,
+// senão o próprio aviso viraria a inundação.
+function dentroDoLimite(ws) {
+  const agora = Date.now();
+
+  if (agora - ws.janelaInicio >= 1000) {
+    ws.janelaInicio = agora;
+    ws.comandosNaJanela = 0;
+    ws.avisouLimite = false;
+  }
+
+  ws.comandosNaJanela += 1;
+
+  if (ws.comandosNaJanela > LIMITE_COMANDOS_POR_S) {
+    if (!ws.avisouLimite) {
+      ws.avisouLimite = true;
+      log(
+        `Comandos de ${ws.enderecoRemoto} acima de ${LIMITE_COMANDOS_POR_S}/s — ` +
+          `o excesso está sendo descartado.`
+      );
+    }
+    return false;
+  }
+
+  return true;
+}
 
 function pressionar(ws, tipo, tecla) {
   if (typeof tecla !== "string" || !TECLAS_PERMITIDAS.has(tecla)) {
@@ -232,9 +332,11 @@ function soltarTeclasSeguradas(ws) {
 // justamente o que fazia o app só funcionar via tethering USB).
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/ets2") {
+    // Sem Access-Control-Allow-Origin: o app é nativo e não passa por CORS,
+    // mas com "*" qualquer página web aberta no navegador conseguia varrer a
+    // rede e ler esta resposta para descobrir o servidor.
     res.writeHead(200, {
       "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
       "Cache-Control": "no-store",
     });
     res.end(
@@ -250,7 +352,20 @@ const server = http.createServer((req, res) => {
   res.writeHead(404).end();
 });
 
-const wss = new WebSocket.Server({ server });
+// O app é nativo e nunca manda cabeçalho Origin. Um navegador SEMPRE manda.
+// Sem esta checagem, uma página qualquer que o usuário abrisse podia varrer a
+// rede local, achar este servidor, conectar e — se ainda não houvesse aparelho
+// pareado — virar o par e digitar teclas no PC, sem o atacante estar na rede.
+function verificarOrigem({ origin, req }, aceitar) {
+  if (origin) {
+    log(`>>> Conexão RECUSADA de ${(req.socket.remoteAddress || "").replace("::ffff:", "")}: veio de um navegador (Origin: ${origin}). <<<`);
+    aceitar(false, 403, "origem-nao-permitida");
+    return;
+  }
+  aceitar(true);
+}
+
+const wss = new WebSocket.Server({ server, verifyClient: verificarOrigem });
 
 let telemetryInterval = null;
 let avisoSchemaEmitido = false;
@@ -317,11 +432,38 @@ wss.on("connection", (ws, req) => {
   ws.autenticado = false;
   ws.teclasSeguradas = new Set();
   ws.enderecoRemoto = (req.socket.remoteAddress || "").replace("::ffff:", "");
+  ws.janelaInicio = Date.now();
+  ws.comandosNaJanela = 0;
+  ws.avisouLimite = false;
+
+  // Nonce novo a cada conexão: a prova que o app manda serve só para esta.
+  ws.nonce = crypto.randomBytes(NONCE_BYTES).toString("hex");
 
   // Sem "hello" em 5 s a conexão cai: nada de telemetria antes de identificar.
   const timerHello = setTimeout(() => {
     if (!ws.autenticado) ws.close(4002, "sem-identificacao");
   }, HELLO_TIMEOUT_MS);
+
+  const recusar = (motivo, codigoFecho, mensagemLog) => {
+    if (mensagemLog) log(mensagemLog);
+    try {
+      ws.send(JSON.stringify({ type: "denied", reason: motivo }));
+    } catch {
+      /* socket já caiu */
+    }
+    ws.close(codigoFecho, motivo);
+  };
+
+  // O app precisa do nonce antes de montar o hello, e precisa saber se este
+  // servidor já tem dono — para pedir o código ao usuário só quando faz sentido.
+  ws.send(
+    JSON.stringify({
+      type: "challenge",
+      protocolo: PROTOCOLO_VERSAO,
+      nonce: ws.nonce,
+      pareado: Boolean(lerPareamento()),
+    })
+  );
 
   ws.on("message", (raw) => {
     let msg;
@@ -343,27 +485,96 @@ wss.on("connection", (ws, req) => {
         return;
       }
 
-      const pareado = lerPareamento();
-      if (pareado && pareado.deviceId !== deviceId) {
-        log(
-          `>>> Conexão RECUSADA de ${ws.enderecoRemoto} ("${nome}"): ` +
-            `já existe um aparelho pareado ("${pareado.nome}"). ` +
-            `Use "Esquecer aparelho" para trocar. <<<`
+      // App da era do pareamento automático: não manda prova nem código.
+      if (msg.protocolo && msg.protocolo < PROTOCOLO_VERSAO) {
+        recusar(
+          RECUSA.PROTOCOLO,
+          4005,
+          `>>> Conexão RECUSADA de ${ws.enderecoRemoto} ("${nome}"): o app usa a ` +
+            `versão ${msg.protocolo} do protocolo e este servidor usa a ` +
+            `${PROTOCOLO_VERSAO}. Atualize o aplicativo. <<<`
         );
-        ws.send(JSON.stringify({ type: "denied", reason: "ja-pareado" }));
-        ws.close(4003, "ja-pareado");
         return;
       }
 
-      if (!pareado) {
-        salvarPareamento(deviceId, nome);
+      const pareado = lerPareamento();
+      let recemPareado = false;
+
+      if (pareado) {
+        // Já existe dono: só entra provando que tem o segredo dele.
+        const prova = typeof msg.prova === "string" ? msg.prova : null;
+
+        if (pareado.deviceId !== deviceId || !prova) {
+          recusar(
+            RECUSA.JA_PAREADO,
+            4003,
+            `>>> Conexão RECUSADA de ${ws.enderecoRemoto} ("${nome}"): já existe ` +
+              `um aparelho pareado ("${pareado.nome}"). Use "Esquecer aparelho" ` +
+              `para trocar. <<<`
+          );
+          return;
+        }
+
+        if (!provaConfere(ws.nonce, pareado.segredo, prova)) {
+          recusar(
+            RECUSA.PROVA_INVALIDA,
+            4004,
+            `>>> Conexão RECUSADA de ${ws.enderecoRemoto} ("${nome}"): o aparelho ` +
+              `não provou ter o segredo do pareamento. <<<`
+          );
+          return;
+        }
+      } else {
+        // Sem dono: entra quem digitar o código mostrado na janela do servidor.
+        const codigo = typeof msg.codigo === "string" ? msg.codigo.trim() : null;
+
+        if (!codigo) {
+          recusar(
+            RECUSA.PRECISA_CODIGO,
+            4006,
+            `Aparelho "${nome}" (${ws.enderecoRemoto}) quer parear — ` +
+              `digite no app o código mostrado aqui.`
+          );
+          return;
+        }
+
+        if (!codigoConfere(codigo)) {
+          recusar(
+            RECUSA.CODIGO_INVALIDO,
+            4007,
+            `>>> Código errado ou expirado vindo de ${ws.enderecoRemoto} ("${nome}"). <<<`
+          );
+          return;
+        }
+
+        const segredo = crypto.randomBytes(SEGREDO_BYTES).toString("hex");
+        if (!salvarPareamento(deviceId, nome, segredo)) {
+          recusar(RECUSA.CODIGO_INVALIDO, 4007, null);
+          return;
+        }
+
+        // Uso único: o código morre no instante em que pareia.
+        limparCodigo();
+        recemPareado = true;
+        ws.segredoEntregue = segredo;
+
         log(`>>> Novo aparelho pareado: "${nome}" (${ws.enderecoRemoto}) <<<`);
         enviarAoPai({ type: "pareamento", pareado: { nome, deviceId } });
       }
 
       clearTimeout(timerHello);
       ws.autenticado = true;
-      ws.send(JSON.stringify({ type: "welcome", protocolo: PROTOCOLO_VERSAO }));
+
+      // O segredo vai no fio uma única vez, no pareamento. Depois disso só
+      // trafega a prova derivada dele.
+      ws.send(
+        JSON.stringify({
+          type: "welcome",
+          protocolo: PROTOCOLO_VERSAO,
+          ...(recemPareado ? { segredo: ws.segredoEntregue } : {}),
+        })
+      );
+
       log(`\n>>> Tablet conectado com sucesso! (IP do cliente: ${ws.enderecoRemoto}) <<<\n`);
       enviarAoPai({ type: "cliente", ip: ws.enderecoRemoto, nome });
       ajustarLoopDeTelemetria();
@@ -371,6 +582,7 @@ wss.on("connection", (ws, req) => {
     }
 
     if (!ws.autenticado) return;
+    if (!dentroDoLimite(ws)) return;
 
     const acao = pressionar(ws, msg.type, msg.payload);
     if (acao) log(`Ação Remota: ${acao}`);
@@ -402,7 +614,8 @@ server.listen(TCP_PORT, "0.0.0.0", () => {
   if (pareado) {
     log(`Aparelho pareado: "${pareado.nome}". Outros aparelhos serão recusados.`);
   } else {
-    log("Nenhum aparelho pareado ainda — o primeiro que conectar será memorizado.");
+    log("Nenhum aparelho pareado ainda — digite o código abaixo no aplicativo.");
+    gerarCodigo();
   }
   enviarAoPai({ type: "pareamento", pareado });
 });
@@ -494,5 +707,7 @@ discoverySocket.bind(DISCOVERY_PORT, () => {
 // --- Comandos vindos do processo pai ----------------------------------------
 
 process.on("message", (msg) => {
-  if (msg && msg.type === "esquecer-pareamento") esquecerPareamento();
+  if (!msg) return;
+  if (msg.type === "esquecer-pareamento") esquecerPareamento();
+  if (msg.type === "novo-codigo") gerarCodigo();
 });

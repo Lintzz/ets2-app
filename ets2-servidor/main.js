@@ -10,6 +10,8 @@ const {
   statusInstalacao,
 } = require("./instalador-plugin");
 const { melhorDllDisponivel } = require("./plugin-remoto");
+const registro = require("./registro");
+const { iniciarAtualizacoes } = require("./atualizador");
 
 if (require("electron-squirrel-startup")) app.quit();
 
@@ -25,6 +27,8 @@ const info = {
   clienteIp: null,
   clienteNome: null,
   pareado: null,
+  codigo: null,
+  codigoExpiraEm: null,
 };
 
 // --- Funções de Comunicação ---
@@ -34,8 +38,17 @@ function enviarParaJanela(canal, dados) {
   }
 }
 
-const sendLogToWindow = (message) => enviarParaJanela("server-log", message);
-const updateStatusDisplay = (message) => enviarParaJanela("server-status", message);
+// Tudo que vai para a janela vai também para o arquivo: a janela mostra só a
+// sessão atual, o arquivo é o que dá para pedir a quem relata um problema.
+const sendLogToWindow = (message) => {
+  registro.escrever(message);
+  enviarParaJanela("server-log", message);
+};
+
+const updateStatusDisplay = (message) => {
+  registro.escrever(`Status: ${message}`);
+  enviarParaJanela("server-status", message);
+};
 const enviarInformacoes = () => enviarParaJanela("server-info", info);
 
 // --- Lógica Principal da Aplicação ---
@@ -117,6 +130,11 @@ function startServerProcess() {
         info.pareado = message.pareado;
         enviarInformacoes();
         break;
+      case "codigo":
+        info.codigo = message.codigo;
+        info.codigoExpiraEm = message.expiraEm;
+        enviarInformacoes();
+        break;
     }
   });
 
@@ -135,6 +153,11 @@ async function configurarFirewall() {
   for (const nome of r.criadas) {
     sendLogToWindow(`Firewall: regra "${nome}" criada.`);
   }
+  if (r.corrigidas.length > 0) {
+    sendLogToWindow(
+      `Firewall: regras limitadas às redes Particular/Domínio (${r.corrigidas.join(", ")}).`
+    );
+  }
   if (r.jaExistiam.length > 0) {
     sendLogToWindow(`Firewall: regras já configuradas (${r.jaExistiam.join(", ")}).`);
   }
@@ -147,9 +170,11 @@ async function configurarFirewall() {
 }
 
 app.whenReady().then(() => {
+  registro.iniciar(app.getPath("userData"), app.getVersion());
   createMainWindow();
   startServerProcess();
   configurarFirewall();
+  iniciarAtualizacoes(sendLogToWindow);
 
   if (process.platform === "darwin") {
     Menu.setApplicationMenu(Menu.buildFromTemplate([]));
@@ -293,10 +318,22 @@ ipcMain.on("restart-server", () => startServerProcess());
 
 ipcMain.on("esquecer-pareamento", () => esquecerPareamento());
 
+ipcMain.on("novo-codigo", () => {
+  if (!serverProcess) return;
+  serverProcess.send({ type: "novo-codigo" });
+});
+
 ipcMain.on("ready-for-info", () => enviarInformacoes());
 
 // Só para o selo de versão na barra de título.
 ipcMain.handle("app:versao", () => app.getVersion());
+
+ipcMain.handle("app:abrir-logs", async () => {
+  const pasta = registro.caminhoDaPasta();
+  if (!pasta) return false;
+  await shell.openPath(pasta);
+  return true;
+});
 
 // --- HANDLERS IPC DO INSTALADOR DE PLUGIN ---
 

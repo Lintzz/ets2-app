@@ -20,8 +20,10 @@ contextBridge.exposeInMainWorld("servidor", {
   // Ações
   reiniciar: () => ipcRenderer.send("restart-server"),
   esquecerAparelho: () => ipcRenderer.send("esquecer-pareamento"),
+  novoCodigo: () => ipcRenderer.send("novo-codigo"),
   pedirInformacoes: () => ipcRenderer.send("ready-for-info"),
   versao: () => ipcRenderer.invoke("app:versao"),
+  abrirLogs: () => ipcRenderer.invoke("app:abrir-logs"),
 
   // Instalação do plugin no jogo
   plugin: {
