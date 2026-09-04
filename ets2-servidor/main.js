@@ -46,10 +46,10 @@ function createMainWindow() {
   }
 
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 640,
-    minWidth: 650,
-    minHeight: 480,
+    width: 1000,
+    height: 720,
+    minWidth: 820,
+    minHeight: 560,
     title: "ETS2 Server Status",
     show: false,
     frame: false,
@@ -294,6 +294,9 @@ ipcMain.on("restart-server", () => startServerProcess());
 ipcMain.on("esquecer-pareamento", () => esquecerPareamento());
 
 ipcMain.on("ready-for-info", () => enviarInformacoes());
+
+// Só para o selo de versão na barra de título.
+ipcMain.handle("app:versao", () => app.getVersion());
 
 // --- HANDLERS IPC DO INSTALADOR DE PLUGIN ---
 

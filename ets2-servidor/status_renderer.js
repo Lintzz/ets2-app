@@ -8,38 +8,117 @@ const ipsText = document.getElementById("ips-text");
 const clientText = document.getElementById("client-text");
 const pairedText = document.getElementById("paired-text");
 const logBox = document.getElementById("log-box");
+const logCount = document.getElementById("log-count");
 const mainStatusPanel = document.getElementById("main-status-panel");
+const uptimeText = document.getElementById("uptime");
+const footerStatus = document.getElementById("footer-status");
+const appVersao = document.getElementById("app-versao");
 
 const MAX_LINHAS_LOG = 500;
 
+const CORES = {
+  verde: "oklch(0.82 0.19 145)",
+  azul: "oklch(0.75 0.13 220)",
+  ambar: "oklch(0.85 0.15 85)",
+  vermelho: "oklch(0.7 0.2 25)",
+  cinza: "#6e7d79",
+};
+
+// O processo principal manda o log como uma frase só. A tag colorida do design
+// é deduzida aqui pela palavra-chave — assim nada muda no protocolo IPC.
+function classificar(msg) {
+  if (/erro|falha|recusad|desatualizado|não foi possível/i.test(msg)) {
+    return { tag: "ERR", cor: CORES.vermelho };
+  }
+  if (/plugin|\.dll/i.test(msg)) return { tag: "PLUG", cor: CORES.verde };
+  if (/pareado|pareamento|aparelho|conect|desconect|cliente/i.test(msg)) {
+    return { tag: "PAIR", cor: CORES.ambar };
+  }
+  if (/\bip\b|interface|porta|rede|firewall|websocket|udp|http/i.test(msg)) {
+    return { tag: "NET", cor: CORES.azul };
+  }
+  if (/^status:/i.test(msg)) return { tag: "STAT", cor: CORES.cinza };
+  return { tag: "INFO", cor: CORES.cinza };
+}
+
+function atualizarContagem() {
+  const n = logBox.childElementCount;
+  logCount.textContent = `${n} ${n === 1 ? "linha" : "linhas"}`;
+}
+
 function addLog(message) {
+  const { tag, cor } = classificar(message);
+
   const entrada = document.createElement("div");
-  entrada.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+  entrada.className = "entrada";
+
+  const hora = document.createElement("span");
+  hora.className = "hora";
+  hora.textContent = new Date().toLocaleTimeString();
+
+  const rotulo = document.createElement("span");
+  rotulo.className = "tag";
+  rotulo.style.color = cor;
+  rotulo.textContent = tag;
+
+  const texto = document.createElement("span");
+  texto.className = "msg";
+  texto.textContent = message;
+
+  entrada.append(hora, rotulo, texto);
   logBox.appendChild(entrada);
 
   // Sem isto o log crescia sem limite numa sessão longa.
   while (logBox.childElementCount > MAX_LINHAS_LOG) {
     logBox.removeChild(logBox.firstChild);
   }
+
+  atualizarContagem();
   logBox.scrollTop = logBox.scrollHeight;
 }
 
+document.getElementById("log-clear").addEventListener("click", () => {
+  logBox.replaceChildren();
+  atualizarContagem();
+});
+
 function updateStatusDisplay(status) {
   statusText.textContent = status;
-  mainStatusPanel.classList.remove("ok", "espera", "erro");
+  footerStatus.textContent = status;
 
+  let cor = CORES.cinza;
   if (status.includes("transmitir")) {
-    mainStatusPanel.classList.add("ok");
+    cor = CORES.verde;
   } else if (status.includes("menu") || status.includes("pausado")) {
-    mainStatusPanel.classList.add("espera");
+    cor = CORES.ambar;
   } else if (
     status.includes("não detectado") ||
     status.includes("Erro") ||
     status.includes("desatualizado")
   ) {
-    mainStatusPanel.classList.add("erro");
+    cor = CORES.vermelho;
   }
+
+  // O dot, a borda do cartão, a varredura e o dot do rodapé leem esta variável.
+  document.documentElement.style.setProperty("--cor-status", cor);
 }
+
+// --- Uptime da janela ---
+
+let inicioUptime = Date.now();
+
+function pintarUptime() {
+  const total = Math.floor((Date.now() - inicioUptime) / 1000);
+  const partes = [
+    Math.floor(total / 3600),
+    Math.floor(total / 60) % 60,
+    total % 60,
+  ].map((n) => String(n).padStart(2, "0"));
+  uptimeText.textContent = `uptime ${partes.join(":")}`;
+}
+
+pintarUptime();
+setInterval(pintarUptime, 1000);
 
 // --- Controles da janela ---
 
@@ -57,6 +136,8 @@ document.getElementById("close-btn").addEventListener("click", () => {
 
 document.getElementById("restart-server-btn").addEventListener("click", () => {
   window.servidor.reiniciar();
+  inicioUptime = Date.now();
+  pintarUptime();
   addLog("Ação: enviando comando para reiniciar o servidor...");
 });
 
@@ -84,10 +165,13 @@ window.servidor.aoReceberInformacoes((info) => {
     .filter((e) => e.ip !== info.serverIp)
     .map((e) => `${e.ip} (${e.nome})`);
   ipsText.textContent = outros.length > 0 ? outros.join(" · ") : "—";
+  ipsText.title = outros.join("\n");
 
   clientText.textContent = info.clienteIp
     ? `${info.clienteNome || "aparelho"} — ${info.clienteIp}`
     : "Nenhum";
+  clientText.classList.toggle("apagado", !info.clienteIp);
+  clientText.classList.toggle("neutro", Boolean(info.clienteIp));
 
   pairedText.textContent = info.pareado ? info.pareado.nome : "Nenhum";
 });
@@ -103,39 +187,47 @@ const btnAbrir = document.getElementById("plugin-abrir-btn");
 const btnVerificar = document.getElementById("plugin-verificar-btn");
 const pluginOrigem = document.getElementById("plugin-origem");
 
-function pintarPlugin(estado) {
-  pluginPanel.classList.remove("ok", "pendente", "ausente");
+function escreverEstado(icone, cor, texto) {
+  pluginPanel.style.setProperty("--cor-plugin", cor);
+  pluginEstado.replaceChildren();
 
+  const marca = document.createElement("span");
+  marca.className = "icone";
+  marca.textContent = icone;
+
+  const rotulo = document.createElement("span");
+  rotulo.textContent = texto;
+
+  pluginEstado.append(marca, rotulo);
+}
+
+function pintarPlugin(estado) {
   if (!estado || !estado.valida) {
-    pluginPanel.classList.add("ausente");
-    pluginEstado.textContent = "Pasta do ETS2 não encontrada";
+    escreverEstado("✕", CORES.vermelho, "Pasta do ETS2 não encontrada");
     pluginCaminho.textContent =
-      "Clique em \"Escolher pasta\" e aponte para a pasta do Euro Truck Simulator 2.";
+      'Clique em "Escolher pasta" e aponte para a pasta do Euro Truck Simulator 2.';
+    pluginCaminho.title = "";
     btnInstalar.disabled = true;
     btnAbrir.disabled = true;
     return;
   }
 
   btnAbrir.disabled = false;
+  btnInstalar.disabled = false;
 
   if (estado.atualizado) {
-    pluginPanel.classList.add("ok");
-    pluginEstado.textContent = "✅ Plugin instalado e atualizado";
-    btnInstalar.disabled = false;
+    escreverEstado("✓", CORES.verde, "Instalado e atualizado");
     btnInstalar.textContent = "Reinstalar";
   } else if (estado.instalado) {
-    pluginPanel.classList.add("pendente");
-    pluginEstado.textContent = "⚠️ Plugin instalado, mas de outra versão";
-    btnInstalar.disabled = false;
-    btnInstalar.textContent = "⬇ Atualizar plugin";
+    escreverEstado("!", CORES.ambar, "Instalado, mas de outra versão");
+    btnInstalar.textContent = "Atualizar plugin";
   } else {
-    pluginPanel.classList.add("pendente");
-    pluginEstado.textContent = "Plugin ainda não instalado";
-    btnInstalar.disabled = false;
-    btnInstalar.textContent = "⬇ Instalar plugin";
+    escreverEstado("!", CORES.ambar, "Plugin ainda não instalado");
+    btnInstalar.textContent = "Instalar plugin";
   }
 
   pluginCaminho.textContent = estado.destino || estado.pastaJogo;
+  pluginCaminho.title = estado.destino || estado.pastaJogo;
   pintarOrigem(estado);
 }
 
@@ -166,7 +258,7 @@ btnEscolher.addEventListener("click", async () => {
 
 btnInstalar.addEventListener("click", async () => {
   btnInstalar.disabled = true;
-  pluginEstado.textContent = "Instalando...";
+  escreverEstado("…", CORES.ambar, "Instalando...");
 
   const r = await window.servidor.plugin.instalar();
   addLog(`Plugin: ${r.mensagem}`);
@@ -191,5 +283,9 @@ btnVerificar.addEventListener("click", async () => {
 btnAbrir.addEventListener("click", () => window.servidor.plugin.abrirPasta());
 
 atualizarPlugin();
+
+window.servidor.versao().then((v) => {
+  appVersao.textContent = `v${v}`;
+});
 
 window.servidor.pedirInformacoes();
