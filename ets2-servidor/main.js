@@ -15,6 +15,17 @@ const { iniciarAtualizacoes } = require("./atualizador");
 
 if (require("electron-squirrel-startup")) app.quit();
 
+// Só um servidor por vez. Fechar a janela apenas a esconde, então quem clicava
+// no atalho de novo abria outro processo inteiro: mais um ícone na bandeja, e um
+// server.js filho que morria na hora com EADDRINUSE na porta 3000 ("Servidor
+// encerrou inesperadamente (código 1)" no log). Com vários escondidos, ninguém
+// percebia.
+const instanciaUnica = app.requestSingleInstanceLock();
+
+// app.quit() e assincrono: sem o guarda no whenReady abaixo, a segunda instancia
+// ainda chegava a abrir o log e a dar fork no server.js antes de morrer.
+if (!instanciaUnica) app.quit();
+
 // Variáveis globais
 let tray = null;
 let mainWindow = null;
@@ -173,6 +184,12 @@ async function configurarFirewall() {
 }
 
 app.whenReady().then(() => {
+  if (!instanciaUnica) return;
+
+  // Segunda tentativa de abrir: em vez de subir outro servidor, traz para a
+  // frente a janela que já existe.
+  app.on("second-instance", () => createMainWindow());
+
   registro.iniciar(app.getPath("userData"), app.getVersion());
   createMainWindow();
   startServerProcess();
