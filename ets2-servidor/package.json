@@ -61,7 +61,7 @@
           "name": "@electron-forge/maker-squirrel",
           "config": {
             "name": "ets2_servidor",
-            "iconUrl": "https://i.imgur.com/Onh99VV.png",
+            "iconUrl": "https://raw.githubusercontent.com/Lintzz/ets2-servidor/main/icon.ico",
             "setupIcon": "icon.ico",
             "createDesktopShortcut": true
           }
