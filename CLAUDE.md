@@ -17,9 +17,10 @@ It used to be three separate repositories. They were merged because every change
 in the history spanned two or three of them: two contracts are duplicated across
 the folder boundaries (see the struct and `protocolo.js` below), and adding one
 telemetry field touches all three. A change like that is now one atomic commit.
-The three former repos are archived on GitHub; their history was rewritten into
-these subdirectories with `git filter-repo`, so `git log -- ets2-plugin/` and
-`git blame` reach back to 2025.
+Their history was rewritten into these subdirectories with `git filter-repo`,
+so `git log -- ets2-plugin/` and `git blame` reach back to 2025. The three
+source repos have since been **deleted** from GitHub, which makes this the only
+copy of that history — there is nowhere left to recover it from.
 
 **Each project keeps its own `.gitignore`, and they must not be merged into one.**
 `ets2-plugin/.gitignore` ignores `*.dll` (Visual Studio build output) while
