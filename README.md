@@ -17,6 +17,14 @@
 > Simulator 2 a 20 Hz pelo Wi-Fi, com botões que acionam os comandos do jogo de
 > volta no PC.
 
+<p align="center">
+  <img src="docs/imagens/painel.jpg" alt="O painel no tablet: botões de luzes, retarder, suspensão e câmeras em volta dos números de telemetria" />
+</p>
+
+<p align="center">
+  <sub>O painel no tablet, com o menu de atalhos aberto no meio.</sub>
+</p>
+
 ---
 
 ## :clipboard: Tabela de Conteúdos
@@ -70,6 +78,15 @@ relógio, com o ícone do mostrador.
 
 > O instalador não tem assinatura digital paga, então o SmartScreen vai avisar.
 > Clique em **Mais informações** → **Executar assim mesmo**.
+
+<p align="center">
+  <img src="docs/imagens/servidor.png" alt="A janela do servidor no PC: status, endereços da rede, painel do plugin, QR code do aplicativo e o log de eventos" />
+</p>
+
+<p align="center">
+  <sub>A janela do servidor. Os endereços de rede e o nome do aparelho pareado
+  estão borrados de propósito.</sub>
+</p>
 
 ### 2. O plugin, no jogo
 
