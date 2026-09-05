@@ -25,6 +25,12 @@ contextBridge.exposeInMainWorld("servidor", {
   versao: () => ipcRenderer.invoke("app:versao"),
   abrirLogs: () => ipcRenderer.invoke("app:abrir-logs"),
 
+  // Firewall do Windows: liberar as portas precisa de administrador
+  firewall: {
+    estado: () => ipcRenderer.invoke("firewall:estado"),
+    liberar: () => ipcRenderer.invoke("firewall:liberar"),
+  },
+
   // Instalação do plugin no jogo
   plugin: {
     estado: () => ipcRenderer.invoke("plugin:estado"),
@@ -45,4 +51,5 @@ contextBridge.exposeInMainWorld("servidor", {
   aoReceberLog: inscrever("server-log"),
   aoMudarStatus: inscrever("server-status"),
   aoReceberInformacoes: inscrever("server-info"),
+  aoMudarFirewall: inscrever("firewall-estado"),
 });

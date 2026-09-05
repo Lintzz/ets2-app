@@ -1,6 +1,6 @@
 {
   "name": "dashlz",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Dashlz — servidor para o dashboard do Euro Truck Simulator 2, com addon nativo para leitura de memória.",
   "repository": {
     "type": "git",

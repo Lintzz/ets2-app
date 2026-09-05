@@ -2,7 +2,11 @@ const { app, Tray, Menu, BrowserWindow, ipcMain, dialog, shell } = require("elec
 const path = require("path");
 const fs = require("fs");
 const { fork } = require("child_process");
-const { garantirRegras } = require("./firewall");
+const {
+  garantirRegras,
+  garantirRegrasElevado,
+  estadoDasRegras,
+} = require("./firewall");
 const { TCP_PORT } = require("./protocolo");
 const {
   detectarPastasETS2,
@@ -162,9 +166,7 @@ function startServerProcess() {
   sendLogToWindow(">>> Processo do Servidor (server.js) iniciado como processo filho.");
 }
 
-async function configurarFirewall() {
-  const r = await garantirRegras();
-
+function relatarFirewall(r) {
   for (const nome of r.criadas) {
     sendLogToWindow(`Firewall: regra "${nome}" criada.`);
   }
@@ -182,6 +184,49 @@ async function configurarFirewall() {
         `Abra o Prompt como admin e rode: ${falha.comando}`
     );
   }
+}
+
+// Criar as regras precisa de administrador, e o app roda como usuário comum de
+// propósito (o instalador Squirrel é por usuário, e subir o servidor e o robotjs
+// elevados não faz falta nenhuma). Então, quando falta regra, pedimos o UAC só
+// para os netsh — uma janela, uma vez.
+//
+// Quem cancelar o UAC não é perguntado de novo: a recusa fica no config.json e
+// sobra o botão "Liberar no Firewall" da janela de status, que chama isto com
+// `forcar` e limpa a recusa.
+async function configurarFirewall({ forcar = false } = {}) {
+  if (forcar) salvarConfig({ firewallElevacaoRecusada: false });
+
+  const podePedirAdmin = forcar || lerConfig().firewallElevacaoRecusada !== true;
+
+  const r = podePedirAdmin
+    ? await garantirRegrasElevado(() =>
+        sendLogToWindow(
+          "Firewall: pedindo permissão de administrador para liberar as portas..."
+        )
+      )
+    : await garantirRegras();
+
+  relatarFirewall(r);
+
+  if (r.recusado) {
+    salvarConfig({ firewallElevacaoRecusada: true });
+    sendLogToWindow(
+      'Firewall: permissão negada. Use o botão "Liberar no Firewall" na janela ' +
+        "de status quando quiser tentar de novo."
+    );
+  } else if (!podePedirAdmin && r.falharam.length > 0) {
+    sendLogToWindow(
+      'Firewall: faltam regras. Clique em "Liberar no Firewall" na janela de status.'
+    );
+  }
+
+  const estado = await estadoDasRegras();
+  // A janela consulta o estado sozinha ao abrir, mas isso pode acontecer antes de
+  // o UAC ser respondido; sem este aviso o cartão ficaria na tela depois de as
+  // regras já terem sido criadas.
+  enviarParaJanela("firewall-estado", estado);
+  return estado;
 }
 
 app.whenReady().then(() => {
@@ -352,6 +397,10 @@ ipcMain.on("novo-codigo", () => {
 ipcMain.on("ready-for-info", () => enviarInformacoes());
 
 // Só para o selo de versão na barra de título.
+ipcMain.handle("firewall:estado", () => estadoDasRegras());
+
+ipcMain.handle("firewall:liberar", () => configurarFirewall({ forcar: true }));
+
 ipcMain.handle("app:versao", () => app.getVersion());
 
 ipcMain.handle("app:abrir-logs", async () => {

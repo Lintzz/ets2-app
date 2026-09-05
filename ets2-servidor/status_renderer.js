@@ -391,6 +391,36 @@ btnApkPagina.addEventListener("click", () => window.servidor.apk.abrirPagina());
 
 atualizarApk();
 
+// --- Firewall ---
+//
+// O cartão só aparece quando falta regra: quem já está liberado (o normal, depois
+// do primeiro UAC) não vê nada aqui.
+
+const firewallAviso = document.getElementById("firewall-aviso");
+const firewallTexto = document.getElementById("firewall-texto");
+const btnFirewall = document.getElementById("firewall-liberar-btn");
+
+function pintarFirewall(estado) {
+  firewallAviso.hidden = !estado || estado.ok;
+  if (!firewallAviso.hidden) {
+    firewallTexto.textContent =
+      `Faltam regras no Firewall (${estado.faltando.join(", ")}). ` +
+      "Sem elas o tablet não enxerga o servidor.";
+  }
+}
+
+btnFirewall.addEventListener("click", async () => {
+  btnFirewall.disabled = true;
+  firewallTexto.textContent = "Pedindo permissão de administrador...";
+
+  pintarFirewall(await window.servidor.firewall.liberar());
+
+  btnFirewall.disabled = false;
+});
+
+window.servidor.aoMudarFirewall(pintarFirewall);
+window.servidor.firewall.estado().then(pintarFirewall);
+
 window.servidor.versao().then((v) => {
   appVersao.textContent = `v${v}`;
 });

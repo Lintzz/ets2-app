@@ -453,6 +453,48 @@
         background: #131a1c;
       }
 
+      /* --- Aviso do Firewall --- */
+
+      #firewall-aviso {
+        border: 1px solid oklch(0.85 0.15 85 / 0.4);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: oklch(0.85 0.15 85 / 0.06);
+      }
+
+      #firewall-aviso .rotulo {
+        color: var(--ambar);
+      }
+
+      #firewall-texto {
+        margin: 6px 0 9px;
+        font-size: 12px;
+        line-height: 1.45;
+        color: var(--muted);
+      }
+
+      #firewall-liberar-btn {
+        width: 100%;
+        padding: 9px;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        cursor: pointer;
+        color: #140f04;
+        background: var(--ambar);
+        border: 0;
+      }
+      #firewall-liberar-btn:hover:not(:disabled) {
+        filter: brightness(1.1);
+      }
+      #firewall-liberar-btn:disabled {
+        cursor: default;
+        opacity: 0.55;
+      }
+
       /* --- Plugin no jogo --- */
 
       #plugin-panel {
@@ -847,6 +889,11 @@
         </div>
 
         <div class="acoes">
+          <div id="firewall-aviso" hidden>
+            <div class="rotulo">Firewall</div>
+            <p id="firewall-texto">As portas do Dashlz estão bloqueadas.</p>
+            <button id="firewall-liberar-btn">Liberar no Firewall</button>
+          </div>
           <button id="restart-server-btn" class="acao">Reiniciar servidor</button>
           <button id="forget-device-btn" class="acao">Esquecer aparelho</button>
         </div>

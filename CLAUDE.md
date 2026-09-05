@@ -261,7 +261,19 @@ paths, including replay and the browser `Origin` case.
 - Keys are checked against `TECLAS_PERMITIDAS` (`protocolo.js`) before reaching
   robotjs, and keys still held when a client disconnects are released.
 - Three states reach the app: full telemetry object (playing), `{jogoRodando:false, inMenu:true}` (menu/paused/idle), and `null` (game not running or not connected). `DashboardScreen` renders `ConexaoScreen` only for `null`. In the menu the grid stays on screen with `aoVivo={false}` — buttons keep working (the ESC widget is how you get back into the game) while the readouts show `--` instead of stale or zeroed values.
-- `main.js` runs `firewall.js` at startup to add inbound rules for TCP 3000 / UDP 48888 with `profile=private,domain` — **not** `any`, which used to leave the port open on Public networks (hotel, café). An existing rule from an older install is rewritten with `netsh ... set rule` (idempotent, locale-independent). Without admin rights it logs the exact `netsh` command instead. Playing on a network Windows marked as Public means changing it to Private, which is the correct setting for a home network anyway.
+- `main.js` runs `firewall.js` at startup to add inbound rules for TCP 3000 / UDP 48888 with `profile=private,domain` — **not** `any`, which used to leave the port open on Public networks (hotel, café). An existing rule from an older install is rewritten with `netsh ... set rule` (idempotent, locale-independent). Creating a rule needs admin, and the app runs
+  unelevated on purpose, so when one is missing `garantirRegrasElevado()` writes the
+  pending `netsh` lines into a temp `.cmd` and runs it through PowerShell
+  `Start-Process -Verb RunAs` — **one** UAC for both rules, and only the `netsh` is
+  elevated, never the server or robotjs. The result is rechecked with
+  `estadoDasRegras()` rather than trusted from the exit code, since a cancelled UAC
+  is indistinguishable from a real failure by message alone. A cancel is remembered
+  as `firewallElevacaoRecusada` in `config.json` so the app never nags; the
+  "Liberar no Firewall" card in `status.html` (hidden while the rules are in place)
+  clears that flag and asks again. The manual `netsh` line stays in the log as the
+  last resort. The Squirrel installer cannot ask for admin itself — it installs
+  per-user and avoids UAC by design, and changing that would break the
+  update.electronjs.org flow. Playing on a network Windows marked as Public means changing it to Private, which is the correct setting for a home network anyway.
 - Everything logged to the window is also appended to `userData/logs/servidor.log` (`registro.js`, 1 MB × 4 files rotation). "Abrir arquivo" in the log header opens the folder — that is what to ask for when someone reports "it doesn't connect".
 - `atualizador.js` wires `update-electron-app` to update.electronjs.org, which reads the public GitHub releases. It only runs from a packaged install on Windows, needs the `npm run make` artifacts attached to the release, and does not remove the SmartScreen warning — that needs a code-signing certificate.
 - Interface selection is scored, not first-come (`pontuar()` in `server.js`): VPN and virtual adapters are penalised. On this machine a Radmin VPN adapter (26.x/8) sorts before the real Ethernet, and the old `addresses[0]` logic announced that unreachable address.
