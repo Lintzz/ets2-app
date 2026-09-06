@@ -137,13 +137,15 @@
         gap: 10px;
       }
 
+      /* O mark de verdade, o mesmo da bandeja e do app. Era um quadrado verde
+         de enfeite. icon.png é o master arredondado, então o border-radius aqui
+         é só garantia caso o arquivo seja trocado por um quadrado. */
       .marca {
         width: 20px;
         height: 20px;
         border-radius: 5px;
-        background: linear-gradient(135deg, oklch(0.8 0.2 145), oklch(0.55 0.16 155));
-        box-shadow: 0 0 14px oklch(0.75 0.2 145 / 0.5);
         flex-shrink: 0;
+        display: block;
       }
 
       .titulo .nome {
@@ -819,7 +821,7 @@
   <body>
     <header>
       <div class="titulo">
-        <span class="marca"></span>
+        <img class="marca" src="icon.png" alt="Dashlz" />
         <span class="nome">Dashlz</span>
         <span id="app-versao"></span>
       </div>
@@ -894,6 +896,7 @@
             <p id="firewall-texto">As portas do Dashlz estão bloqueadas.</p>
             <button id="firewall-liberar-btn">Liberar no Firewall</button>
           </div>
+          <button id="abrir-painel-btn" class="acao">Abrir painel</button>
           <button id="restart-server-btn" class="acao">Reiniciar servidor</button>
           <button id="forget-device-btn" class="acao">Esquecer aparelho</button>
         </div>

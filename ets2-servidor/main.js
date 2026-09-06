@@ -17,6 +17,8 @@ const { melhorDllDisponivel } = require("./plugin-remoto");
 const { estadoDoApk } = require("./app-remoto");
 const registro = require("./registro");
 const { iniciarAtualizacoes } = require("./atualizador");
+const { painelParaJanela, avaliarPainel, definirLayout } = require("./painel");
+const layouts = require("./layouts");
 
 if (require("electron-squirrel-startup")) app.quit();
 
@@ -34,6 +36,7 @@ if (!instanciaUnica) app.quit();
 // Variáveis globais
 let tray = null;
 let mainWindow = null;
+let dashboardWindow = null;
 let serverProcess = null;
 
 const info = {
@@ -66,6 +69,50 @@ const updateStatusDisplay = (message) => {
   enviarParaJanela("server-status", message);
 };
 const enviarInformacoes = () => enviarParaJanela("server-info", info);
+
+// A telemetria só interessa à janela do painel; a de status recebe apenas a frase
+// de estado derivada, como sempre recebeu.
+function enviarParaDashboard(canal, dados) {
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.webContents.send(canal, dados);
+  }
+}
+
+// Ponto único por onde o layout ativo se espalha: para o espelho (painel.js) e
+// para o tablet (server.js). Também é reenviado a cada fork, porque um servidor
+// recém-nascido não sabe qual preset está valendo.
+function aplicarLayoutAtivo({ recarregarJanela = true } = {}) {
+  const ativo = layouts.layoutAtivo();
+
+  for (const erro of ativo.erros || []) sendLogToWindow(`Layout: ${erro}`);
+
+  definirLayout(ativo.widgets, ativo.tela);
+  if (serverProcess && serverProcess.connected) {
+    serverProcess.send({
+      type: "layout",
+      nome: ativo.nome,
+      tela: ativo.tela || null,
+      widgets: ativo.widgets,
+    });
+  }
+  // A janela monta os widgets uma vez, no carregamento: para trocar de layout ela
+  // precisa remontar.
+  if (recarregarJanela && dashboardWindow && !dashboardWindow.isDestroyed()) {
+    dashboardWindow.reload();
+  }
+  return ativo;
+}
+
+// O server.js só liga o loop de telemetria quando alguém precisa dele. Precisa ser
+// reavisado a cada fork, senão um "Reiniciar Servidor" com a janela aberta deixa o
+// painel congelado.
+function avisarPreview(ativo) {
+  // `connected` porque ao sair do app o servidor é morto antes das janelas
+  // fecharem, e o "closed" da janela do painel cairia num canal IPC já fechado.
+  if (serverProcess && serverProcess.connected) {
+    serverProcess.send({ type: "preview", ativo });
+  }
+}
 
 // --- Lógica Principal da Aplicação ---
 function createMainWindow() {
@@ -107,6 +154,49 @@ function createMainWindow() {
   });
 
   mainWindow.webContents.on("did-finish-load", enviarInformacoes);
+}
+
+// Espelho do painel do tablet. Desenha o mesmo layout, a partir do mesmo catálogo
+// em compartilhado/, e o anima com a telemetria real — inclusive sem tablet
+// nenhum conectado, que é quando se está conferindo o layout no PC. É só leitura:
+// não há caminho daqui para o robotjs.
+function createDashboardWindow() {
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    if (dashboardWindow.isMinimized()) dashboardWindow.restore();
+    dashboardWindow.focus();
+    return;
+  }
+
+  dashboardWindow = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 640,
+    minHeight: 440,
+    title: "Dashlz — Painel",
+    icon: path.join(__dirname, process.platform === "win32" ? "icon.ico" : "icon.png"),
+    show: false,
+    frame: false,
+    autoHideMenuBar: true,
+    titleBarStyle: "hidden",
+    backgroundColor: "#0F1014",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  dashboardWindow.loadFile(path.join(__dirname, "dashboard.html"));
+  dashboardWindow.once("ready-to-show", () => dashboardWindow.show());
+
+  // Esta fecha de verdade, ao contrário da de status: com ela fechada e sem
+  // tablet, o servidor volta a não ler a memória compartilhada.
+  dashboardWindow.on("closed", () => {
+    dashboardWindow = null;
+    avisarPreview(false);
+  });
+
+  avisarPreview(true);
 }
 
 function startServerProcess() {
@@ -154,8 +244,20 @@ function startServerProcess() {
         info.codigoExpiraEm = message.expiraEm;
         enviarInformacoes();
         break;
+      case "telemetria":
+        // A janela recebe só o estado de cada widget: o catálogo e o avaliador
+        // ficam aqui, do lado que tem Node.
+        if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+          enviarParaDashboard("dashboard-telemetria", avaliarPainel(message.payload));
+        }
+        break;
     }
   });
+
+  // Um servidor recém-nascido não sabe que a janela do painel está aberta, nem
+  // qual layout está ativo.
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) avisarPreview(true);
+  aplicarLayoutAtivo({ recarregarJanela: false });
 
   serverProcess.on("exit", (code, signal) => {
     if (!app.isQuitting && signal !== "SIGKILL") {
@@ -256,6 +358,10 @@ app.whenReady().then(() => {
     {
       label: "Mostrar/Esconder Status",
       click: () => createMainWindow(),
+    },
+    {
+      label: "Abrir Painel",
+      click: () => createDashboardWindow(),
     },
     {
       label: "Reiniciar Servidor",
@@ -368,21 +474,53 @@ async function estadoDoPlugin(opcoes) {
 
 // --- HANDLERS IPC ---
 
+// Pela janela que mandou, não pela mainWindow: são duas agora, e as duas são
+// frameless, com os botões desenhados em HTML.
 ipcMain.on("window-control", (event, action) => {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const janela = BrowserWindow.fromWebContents(event.sender);
+  if (!janela || janela.isDestroyed()) return;
 
   switch (action) {
     case "minimize":
-      mainWindow.minimize();
+      janela.minimize();
       break;
     case "maximize":
-      if (mainWindow.isMaximized()) mainWindow.unmaximize();
-      else mainWindow.maximize();
+      if (janela.isMaximized()) janela.unmaximize();
+      else janela.maximize();
       break;
     case "close":
-      mainWindow.close();
+      janela.close();
       break;
   }
+});
+
+ipcMain.on("abrir-dashboard", () => createDashboardWindow());
+
+ipcMain.handle("dashboard:painel", () => painelParaJanela());
+
+// --- Layouts do painel ---
+//
+// Todos devolvem o estado novo junto, no formato { ok, mensagem, ... } dos demais
+// handlers, para o renderer repintar sem uma segunda ida ao main.
+const responderLayout = (r) => {
+  if (r.mensagem) sendLogToWindow(`Layout: ${r.mensagem}`);
+  if (r.ok) aplicarLayoutAtivo();
+  return { ...r, estado: layouts.estado() };
+};
+
+ipcMain.handle("layout:estado", () => layouts.estado());
+ipcMain.handle("layout:ativar", (_e, id) => responderLayout(layouts.ativar(id)));
+ipcMain.handle("layout:duplicar", (_e, id, nome) => responderLayout(layouts.duplicar(id, nome)));
+ipcMain.handle("layout:renomear", (_e, id, nome) => responderLayout(layouts.renomear(id, nome)));
+ipcMain.handle("layout:excluir", (_e, id) => responderLayout(layouts.excluir(id)));
+
+// Salvar não recarrega a janela: o editor já tem a tela do jeito que o usuário
+// montou, e recarregar jogaria fora a seleção e o histórico de desfazer.
+ipcMain.handle("layout:salvar", (_e, id, widgets, tela) => {
+  const r = layouts.salvarWidgets(id, widgets, tela);
+  if (r.mensagem) sendLogToWindow(`Layout: ${r.mensagem}`);
+  if (r.ok) aplicarLayoutAtivo({ recarregarJanela: false });
+  return { ...r, estado: layouts.estado() };
 });
 
 ipcMain.on("restart-server", () => startServerProcess());

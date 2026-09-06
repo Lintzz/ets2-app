@@ -22,22 +22,17 @@ export default StyleSheet.create({
     backgroundColor: colors.background,
   },
   statusText: { fontSize: 22, color: colors.accent, fontWeight: "bold" },
+  // Só a forma. Fundo e borda (e o par ativo, que era o iconButtonActive) vêm de
+  // options.cores, aplicados por style inline em DashboardWidget.js.
   iconButtonInner: {
     width: "100%",
     height: "100%",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.surfaceTransparent,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#333",
-  },
-  iconButtonActive: {
-    borderColor: colors.accent,
-    backgroundColor: "rgba(0, 255, 127, 0.2)",
   },
   iconButtonLabel: {
-    color: colors.fontSecondary,
     fontSize: 10,
     position: "absolute",
     bottom: 5,
@@ -48,8 +43,8 @@ export default StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 5,
   },
-  displayValue: { color: colors.font, fontSize: 18, fontWeight: "bold" },
-  displayLabel: { color: colors.fontSecondary, fontSize: 10 },
+  displayValue: { fontSize: 18, fontWeight: "bold" },
+  displayLabel: { fontSize: 10 },
   gridContainer: { flex: 1 },
 
   // Faixa discreta no topo enquanto o jogo está no menu/pausado. pointerEvents

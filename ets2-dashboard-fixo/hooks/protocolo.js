@@ -31,6 +31,12 @@ export const RECUSA = {
 export const CHAVE_DEVICE_ID = "ets2:deviceId";
 export const CHAVE_ULTIMO_IP = "ets2:ultimoServidor";
 export const CHAVE_SEGREDO = "ets2:segredoPareamento";
+export const CHAVE_LAYOUT = "ets2:layout";
+
+// Anunciado no hello. O servidor só manda o que o app sabe receber: um APK antigo
+// não declara nada e por isso nunca recebe `layout`, que ele trataria como
+// telemetria (o onmessage dele cai em setTelemetry para tudo que não reconhece).
+export const RECURSOS = ["layout"];
 
 // Tempos
 export const TIMEOUT_IDENTIFICACAO_MS = 800; // por IP durante a varredura

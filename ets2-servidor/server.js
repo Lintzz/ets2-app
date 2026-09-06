@@ -388,19 +388,53 @@ function verificarOrigem({ origin, req }, aceitar) {
   aceitar(false, 403, "origem-nao-permitida");
 }
 
-const wss = new WebSocket.Server({ server, verifyClient: verificarOrigem });
+// maxPayload: o default do ws e 100 MB. Nada que o app manda chega perto disso,
+// e sem limite uma mensagem gigante seria bufferizada inteira antes de ser olhada.
+const wss = new WebSocket.Server({
+  server,
+  verifyClient: verificarOrigem,
+  maxPayload: 256 * 1024,
+});
 
 let telemetryInterval = null;
 let avisoSchemaEmitido = false;
+
+// A janela de espelho do servidor conta como consumidor de telemetria: sem isto o
+// loop só existiria com um tablet autenticado, e não daria para conferir o painel
+// no PC — que é justamente quando se está mexendo no layout.
+let previewAtivo = false;
+// Layout ativo, mandado pelo main.js. Vai para o tablet depois do welcome — mas só
+// para quem declarou o recurso "layout" no hello (ver enviarLayout).
+let layoutAtual = null;
+// 20 Hz por IPC + webContents.send é caro para um espelho, e o olho não ganha
+// nada com isso. O tablet continua recebendo todos os quadros.
+const PREVIEW_A_CADA = 3;
+let previewContador = 0;
 
 const clientesAutenticados = () =>
   [...wss.clients].filter(
     (c) => c.autenticado && c.readyState === WebSocket.OPEN
   );
 
+// Só para quem pediu. Ver o comentário sobre `recursos` no hello.
+function enviarLayout(ws) {
+  if (!layoutAtual) return;
+  if (!ws.autenticado || ws.readyState !== WebSocket.OPEN) return;
+  if (!ws.recursos || !ws.recursos.has("layout")) return;
+
+  ws.send(
+    JSON.stringify({
+      type: "layout",
+      nome: layoutAtual.nome,
+      tela: layoutAtual.tela || null,
+      widgets: layoutAtual.widgets,
+    })
+  );
+}
+
 function transmitirTelemetria() {
   const clientes = clientesAutenticados();
-  if (clientes.length === 0) return;
+  if (clientes.length === 0 && !previewAtivo) return;
 
   const dados = leitorMemoria.lerDados();
   let payload;
@@ -437,16 +471,24 @@ function transmitirTelemetria() {
   for (const cliente of clientes) {
     cliente.send(payload);
   }
+
+  // Mesma string, sem serializar de novo. Reduzida porque a janela de espelho não
+  // precisa dos 20 Hz do tablet.
+  if (previewAtivo && ++previewContador >= PREVIEW_A_CADA) {
+    previewContador = 0;
+    enviarAoPai({ type: "telemetria", payload });
+  }
 }
 
 function ajustarLoopDeTelemetria() {
-  const ativos = clientesAutenticados().length;
+  const precisa = clientesAutenticados().length > 0 || previewAtivo;
 
-  if (ativos > 0 && !telemetryInterval) {
+  if (precisa && !telemetryInterval) {
     telemetryInterval = setInterval(transmitirTelemetria, TELEMETRIA_INTERVALO_MS);
-  } else if (ativos === 0 && telemetryInterval) {
+  } else if (!precisa && telemetryInterval) {
     clearInterval(telemetryInterval);
     telemetryInterval = null;
+    previewContador = 0;
     status("Aguardando conexão do tablet...");
   }
 }
@@ -502,6 +544,14 @@ wss.on("connection", (ws, req) => {
       if (ws.autenticado) return;
       const deviceId = typeof msg.deviceId === "string" ? msg.deviceId : null;
       const nome = typeof msg.nome === "string" ? msg.nome.slice(0, 60) : "aparelho";
+      // Capacidades do app. O APK antigo não manda nada aqui, e é justamente o que
+      // o protege: o onmessage dele trata como telemetria tudo que não reconhece,
+      // então receber um layout encheria os mostradores de lixo.
+      ws.recursos = new Set(
+        Array.isArray(msg.recursos)
+          ? msg.recursos.filter((r) => typeof r === "string")
+          : []
+      );
 
       if (!deviceId) {
         ws.close(4002, "sem-identificacao");
@@ -599,6 +649,9 @@ wss.on("connection", (ws, req) => {
       );
 
       log(`\n>>> Tablet conectado com sucesso! (IP do cliente: ${ws.enderecoRemoto}) <<<\n`);
+      // Layout logo depois do welcome, no socket ja autenticado.
+      enviarLayout(ws);
+
       enviarAoPai({ type: "cliente", ip: ws.enderecoRemoto, nome });
       ajustarLoopDeTelemetria();
       return;
@@ -733,4 +786,14 @@ process.on("message", (msg) => {
   if (!msg) return;
   if (msg.type === "esquecer-pareamento") esquecerPareamento();
   if (msg.type === "novo-codigo") gerarCodigo();
+  if (msg.type === "layout") {
+    layoutAtual = { nome: msg.nome, tela: msg.tela || null, widgets: msg.widgets };
+    // Troca de preset com o tablet já conectado: empurra na hora, sem reconectar.
+    for (const cliente of clientesAutenticados()) enviarLayout(cliente);
+  }
+  if (msg.type === "preview") {
+    previewAtivo = !!msg.ativo;
+    previewContador = 0;
+    ajustarLoopDeTelemetria();
+  }
 });

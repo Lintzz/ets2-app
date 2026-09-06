@@ -1,12 +1,19 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
+import { avaliarAtivo } from "../../../compartilhado/avaliador";
+import { resolverCores } from "../../../compartilhado/cores";
 
-const AlertIndicator = ({ telemetry, options }) => {
-  const isActive = options.isActiveCheck(telemetry);
+// aoVivo === false: jogo no menu ou pausado. O alerta apaga em vez de congelar no
+// último estado, pelo mesmo motivo que os mostradores viram "--".
+const AlertIndicator = ({ telemetry, options, aoVivo = true, cores }) => {
+  const isActive = aoVivo && avaliarAtivo(options.ativoSe, telemetry);
   const showLabel = options.showLabel !== false;
 
-  const iconColor = isActive ? options.activeColor || "#FF3B30" : "#444";
-  const labelColor = isActive ? "#EAEAEA" : "#444";
+  // `cores` chega pronto do DashboardWidget; o resolver aqui é só para o caso de
+  // o componente ser usado solto.
+  const paleta = cores || resolverCores(options.cores);
+  const iconColor = isActive ? paleta.alerta : paleta.alertaApagado;
+  const labelColor = isActive ? paleta.valor : paleta.alertaApagado;
 
   const renderIcon = () => {
     if (typeof options.iconName === "function") {

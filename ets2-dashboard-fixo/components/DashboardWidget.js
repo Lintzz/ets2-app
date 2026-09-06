@@ -4,6 +4,9 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { avaliarAtivo, formatarValor } from "../../compartilhado/avaliador";
+import { resolverCores } from "../../compartilhado/cores";
+import { TAMANHO_CELULA } from "../../compartilhado/constantes";
 import styles from "../styles/dashboardStyles";
 import AlertIndicator from "./custom/AlertIndicator";
 import FuelGaugeWidget from "./custom/FuelGaugeWidget";
@@ -15,16 +18,20 @@ import FuelGaugeWidget from "./custom/FuelGaugeWidget";
 const WidgetContent = ({ config, telemetry, isBeingPressed, aoVivo }) => {
   const { type, options } = config;
 
-  const isTelemetryActive =
-    aoVivo && options.isActiveCheck ? options.isActiveCheck(telemetry) : false;
+  const isTelemetryActive = aoVivo && avaliarAtivo(options.ativoSe, telemetry);
+  // options.cores é parcial; o que faltar vem do padrão de compartilhado/cores.js.
+  const cores = resolverCores(options.cores);
 
   const isEffectivelyActive = isTelemetryActive || isBeingPressed;
 
-  const widgetSize = { width: config.w * 35, height: config.h * 35 };
+  const widgetSize = {
+    width: config.w * TAMANHO_CELULA,
+    height: config.h * TAMANHO_CELULA,
+  };
   const iconSize = Math.min(widgetSize.width, widgetSize.height) * 0.6;
 
   const renderIconOrImage = () => {
-    const iconColor = isEffectivelyActive ? "#00FF7F" : "#FFF";
+    const iconColor = isEffectivelyActive ? cores.iconeAtiva : cores.icone;
     if (typeof options.iconName === "function") {
       const SvgComponent = options.iconName;
       return (
@@ -50,7 +57,7 @@ const WidgetContent = ({ config, telemetry, isBeingPressed, aoVivo }) => {
           style={{
             width: "100%",
             height: "100%",
-            backgroundColor: options.color,
+            backgroundColor: cores.fundo,
             borderRadius: 12,
           }}
         />
@@ -60,7 +67,7 @@ const WidgetContent = ({ config, telemetry, isBeingPressed, aoVivo }) => {
         <Text
           style={{
             fontSize: options.fontSize || 24,
-            color: options.color || "#EAEAEA",
+            color: cores.valor,
             fontWeight: "bold",
             textAlign: "center",
           }}
@@ -74,29 +81,45 @@ const WidgetContent = ({ config, telemetry, isBeingPressed, aoVivo }) => {
         <View
           style={[
             styles.iconButtonInner,
-            isEffectivelyActive && styles.iconButtonActive,
+            {
+              backgroundColor: isEffectivelyActive ? cores.fundoAtiva : cores.fundo,
+              borderColor: isEffectivelyActive ? cores.bordaAtiva : cores.borda,
+            },
           ]}
         >
           {renderIconOrImage()}
         </View>
       );
     case "DataDisplay":
-      const displayValue =
-        aoVivo && typeof options.value === "function"
-          ? options.value(telemetry)
-          : "--";
+      const displayValue = aoVivo ? formatarValor(options.valor, telemetry) : "--";
       return (
         <View style={styles.display}>
-          <Text style={styles.displayLabel}>{options.label}</Text>
-          <Text style={styles.displayValue}>{displayValue}</Text>
+          <Text style={[styles.displayLabel, { color: cores.rotulo }]}>
+            {options.label}
+          </Text>
+          <Text style={[styles.displayValue, { color: cores.valor }]}>
+            {displayValue}
+          </Text>
         </View>
       );
     case "FuelGauge":
       return (
-        <FuelGaugeWidget telemetry={telemetry} options={options} aoVivo={aoVivo} />
+        <FuelGaugeWidget
+          telemetry={telemetry}
+          options={options}
+          aoVivo={aoVivo}
+          cores={cores}
+        />
       );
     case "Alert":
-      return <AlertIndicator telemetry={telemetry} options={options} />;
+      return (
+        <AlertIndicator
+          telemetry={telemetry}
+          options={options}
+          aoVivo={aoVivo}
+          cores={cores}
+        />
+      );
     default:
       return <Text style={{ color: "red" }}>Tipo: {type}?</Text>;
   }
@@ -154,7 +177,14 @@ const DashboardWidget = ({
             !!config.options.label &&
             (config.type === "IconButton" ||
               config.type === "CircularButton") && (
-              <Text style={styles.iconButtonLabel}>{config.options.label}</Text>
+              <Text
+                style={[
+                  styles.iconButtonLabel,
+                  { color: resolverCores(config.options.cores).rotulo },
+                ]}
+              >
+                {config.options.label}
+              </Text>
             )}
         </TouchableOpacity>
       </View>

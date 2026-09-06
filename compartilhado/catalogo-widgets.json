@@ -1,0 +1,990 @@
+{
+  "color-area": {
+    "w": 6,
+    "h": 6,
+    "type": "ColorArea",
+    "options": {
+      "label": "Área Colorida",
+      "cores": {
+        "fundo": "#1E2027"
+      }
+    }
+  },
+  "text-widget": {
+    "w": 6,
+    "h": 2,
+    "type": "TextWidget",
+    "options": {
+      "label": "Texto Decorativo",
+      "text": "Meu Texto",
+      "fontSize": 24,
+      "fontFamily": "",
+      "cores": {
+        "valor": "#EAEAEA"
+      }
+    }
+  },
+  "electric-btn": {
+    "w": 3,
+    "h": 3,
+    "type": "CircularButton",
+    "options": {
+      "iconName": "flash",
+      "label": "Energia",
+      "key": "f10",
+      "ativoSe": {
+        "campo": "electricoLigado"
+      }
+    }
+  },
+  "engine-btn": {
+    "w": 3,
+    "h": 3,
+    "type": "CircularButton",
+    "options": {
+      "iconName": "engine",
+      "label": "Motor",
+      "key": "e",
+      "ativoSe": {
+        "campo": "motorLigado"
+      }
+    }
+  },
+  "transmission-mode-btn": {
+    "w": 3,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "car-shift-pattern",
+      "label": "Câmbio M/A",
+      "key": "a"
+    }
+  },
+  "parking-brake-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "car-brake-parking",
+      "label": "Freio de Mão",
+      "key": "space",
+      "ativoSe": {
+        "campo": "freioEstacionamento"
+      }
+    }
+  },
+  "diff-lock-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:Diferencial",
+      "label": "Diferencial",
+      "key": "v",
+      "ativoSe": {
+        "campo": "bloqueioDiferencial"
+      }
+    }
+  },
+  "lift-truck-axle": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:EixoCavalo",
+      "label": "Eixo Cavalo",
+      "key": "u",
+      "ativoSe": {
+        "campo": "eixoCaminhaoLevantado"
+      }
+    }
+  },
+  "lift-trailer-axle": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:EixoCarreta",
+      "label": "Eixo Carreta",
+      "key": "left",
+      "ativoSe": {
+        "campo": "eixoReboqueLevantado"
+      }
+    }
+  },
+  "trailer-attach": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:Engate",
+      "label": "Engate",
+      "key": "t",
+      "ativoSe": {
+        "campo": "reboqueConectado"
+      }
+    }
+  },
+  "engine-brake-toggle": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "engine-off-outline",
+      "label": "Freio Motor",
+      "key": "b",
+      "ativoSe": {
+        "campo": "freioMotor"
+      }
+    }
+  },
+  "engine-brake-increase": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "chevron-up",
+      "label": "Freio Motor +",
+      "key": "up",
+      "isContinuous": true
+    }
+  },
+  "engine-brake-decrease": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "chevron-down",
+      "label": "Freio Motor -",
+      "key": "down",
+      "isContinuous": true
+    }
+  },
+  "retarder-toggle": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "car-brake-retarder",
+      "label": "Retarder M/A",
+      "key": "right"
+    }
+  },
+  "retarder-increase": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "chevron-up",
+      "label": "Retarder +",
+      "key": ";",
+      "isContinuous": true
+    }
+  },
+  "retarder-decrease": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "chevron-down",
+      "label": "Retarder -",
+      "key": "'",
+      "isContinuous": true
+    }
+  },
+  "cruise-control-toggle": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "car-cruise-control",
+      "label": "Ativar CC",
+      "key": "c",
+      "ativoSe": {
+        "campo": "velocidadeCruzeiroKmh",
+        "op": ">",
+        "valor": 0
+      }
+    }
+  },
+  "cruise-control-increase": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "chevron-up",
+      "label": "CC +",
+      "key": "w",
+      "isContinuous": true
+    }
+  },
+  "cruise-control-decrease": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "chevron-down",
+      "label": "CC -",
+      "key": "s",
+      "isContinuous": true
+    }
+  },
+  "lights-parking": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "car-light-dimmed",
+      "label": "Lanterna",
+      "key": "l",
+      "ativoSe": {
+        "campo": "luzesEstacionamento"
+      }
+    }
+  },
+  "lights-low": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "car-light-fog",
+      "label": "Farol Baixo",
+      "key": "l",
+      "ativoSe": {
+        "campo": "farolBaixo"
+      }
+    }
+  },
+  "lights-high": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "car-light-high",
+      "label": "Farol Alto",
+      "key": "k",
+      "ativoSe": {
+        "campo": "farolAlto"
+      }
+    }
+  },
+  "beacon-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "alarm-light",
+      "label": "Giroflex",
+      "key": "o",
+      "ativoSe": {
+        "campo": "luzGiroflex"
+      }
+    }
+  },
+  "hazard-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "hazard-lights",
+      "label": "Pisca Alerta",
+      "key": "f",
+      "ativoSe": {
+        "campo": "piscaAlerta"
+      }
+    }
+  },
+  "camera-1": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:Cam1",
+      "label": "Câmera 1",
+      "key": "1"
+    }
+  },
+  "camera-2": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:Cam2",
+      "label": "Câmera 2",
+      "key": "2"
+    }
+  },
+  "camera-3": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:Cam3",
+      "label": "Câmera 3",
+      "key": "3"
+    }
+  },
+  "window-left-up": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "chevron-up",
+      "label": "Vidro Esq. +",
+      "key": "end",
+      "isContinuous": true
+    }
+  },
+  "window-left-down": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "chevron-down",
+      "label": "Vidro Esq. -",
+      "key": "home",
+      "isContinuous": true
+    }
+  },
+  "window-right-up": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "chevron-up",
+      "label": "Vidro Dir. +",
+      "key": "delete",
+      "isContinuous": true
+    }
+  },
+  "window-right-down": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "chevron-down",
+      "label": "Vidro Dir. -",
+      "key": "insert",
+      "isContinuous": true
+    }
+  },
+  "wipers-increase": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "wiper",
+      "label": "Limpador +",
+      "key": "p"
+    }
+  },
+  "wipers-decrease": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "wiper",
+      "label": "Limpador -",
+      "key": "q"
+    }
+  },
+  "susp-front-up": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:SuspDianteiraMais",
+      "label": "Susp. Diant+",
+      "key": "numpad_1",
+      "isContinuous": true
+    }
+  },
+  "susp-front-down": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:SuspDianteiraMenos",
+      "label": "Susp. Diant-",
+      "key": "numpad_2",
+      "isContinuous": true
+    }
+  },
+  "susp-rear-up": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:SuspTraseiraMais",
+      "label": "Susp. Tras+",
+      "key": "numpad_3",
+      "isContinuous": true
+    }
+  },
+  "susp-rear-down": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:SuspTraseiraMenos",
+      "label": "Susp. Tras-",
+      "key": "numpad_4",
+      "isContinuous": true
+    }
+  },
+  "susp-reset": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "iconName": "svg:SuspPadrao",
+      "label": "Reset Susp.",
+      "key": "numpad_0"
+    }
+  },
+  "advisor-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "map-marker",
+      "label": "Advisor",
+      "key": "f5"
+    }
+  },
+  "jobs-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "briefcase",
+      "label": "Trabalhos",
+      "key": "f6"
+    }
+  },
+  "settings-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "cog",
+      "label": "Settings",
+      "key": "f7"
+    }
+  },
+  "modes-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "view-grid",
+      "label": "Modes",
+      "key": "f3"
+    }
+  },
+  "config-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "tune",
+      "label": "Config",
+      "key": "f4"
+    }
+  },
+  "mirrors-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "mirror-rectangle",
+      "label": "Retrovisores",
+      "key": "f2"
+    }
+  },
+  "map-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "map-legend",
+      "label": "Mapa",
+      "key": "m"
+    }
+  },
+  "dashboard-panel-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "view-dashboard",
+      "label": "Painel",
+      "key": "i"
+    }
+  },
+  "garage-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "garage",
+      "label": "Garagem",
+      "key": "g"
+    }
+  },
+  "windows-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "microsoft-windows",
+      "label": "Windows",
+      "key": "command"
+    }
+  },
+  "esc-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "keyboard-esc",
+      "label": "ESC",
+      "key": "escape"
+    }
+  },
+  "enter-btn": {
+    "w": 2,
+    "h": 2,
+    "type": "IconButton",
+    "options": {
+      "showLabel": false,
+      "iconName": "keyboard-return",
+      "label": "Enter",
+      "key": "enter"
+    }
+  },
+  "speed-display": {
+    "w": 3,
+    "h": 2,
+    "type": "DataDisplay",
+    "options": {
+      "label": "KM/H",
+      "valor": {
+        "campo": "velocidadeKmh",
+        "casas": 0
+      }
+    }
+  },
+  "gear-display": {
+    "w": 3,
+    "h": 2,
+    "type": "DataDisplay",
+    "options": {
+      "label": "MARCHA",
+      "valor": {
+        "campo": "marcha",
+        "formato": "marcha"
+      }
+    }
+  },
+  "fuel-gauge": {
+    "w": 4,
+    "h": 2,
+    "type": "FuelGauge",
+    "options": {
+      "label": "COMBUSTÍVEL"
+    }
+  },
+  "job-distance": {
+    "w": 4,
+    "h": 2,
+    "type": "DataDisplay",
+    "options": {
+      "label": "DISTÂNCIA VIAGEM",
+      "valor": {
+        "campo": "navDistancia",
+        "divisor": 1000,
+        "casas": 1,
+        "sufixo": " km"
+      }
+    }
+  },
+  "damage-truck-display": {
+    "w": 4,
+    "h": 2,
+    "type": "DataDisplay",
+    "options": {
+      "label": "DANO CAMINHÃO",
+      "valor": {
+        "campo": "danoMotor",
+        "escala": 100,
+        "casas": 0,
+        "sufixo": "%"
+      }
+    }
+  },
+  "damage-trailer-display": {
+    "w": 4,
+    "h": 2,
+    "type": "DataDisplay",
+    "options": {
+      "label": "DANO CARRETA",
+      "valor": {
+        "campo": "danoReboque",
+        "escala": 100,
+        "casas": 0,
+        "sufixo": "%"
+      }
+    }
+  },
+  "damage-cargo-display": {
+    "w": 4,
+    "h": 2,
+    "type": "DataDisplay",
+    "options": {
+      "label": "DANO CARGA",
+      "valor": {
+        "campo": "danoCarga",
+        "escala": 100,
+        "casas": 0,
+        "sufixo": "%"
+      }
+    }
+  },
+  "cruise-control-speed-display": {
+    "w": 3,
+    "h": 2,
+    "type": "DataDisplay",
+    "options": {
+      "label": "VEL. CRUZEIRO",
+      "valor": {
+        "campo": "velocidadeCruzeiroKmh",
+        "casas": 0
+      }
+    }
+  },
+  "retarder-display": {
+    "w": 3,
+    "h": 2,
+    "type": "DataDisplay",
+    "options": {
+      "label": "NÍVEL RETARDER",
+      "valor": {
+        "campo": "retarder"
+      }
+    }
+  },
+  "status-turn-left": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "arrow-left-bold",
+      "label": "Seta Esq.",
+      "ativoSe": {
+        "campo": "piscaEsquerdoOn"
+      },
+      "cores": {
+        "alerta": "#FFD700"
+      }
+    }
+  },
+  "status-turn-right": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "arrow-right-bold",
+      "label": "Seta Dir.",
+      "ativoSe": {
+        "campo": "piscaDireitoOn"
+      },
+      "cores": {
+        "alerta": "#FFD700"
+      }
+    }
+  },
+  "status-beacon": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "alarm-light",
+      "label": "Giroflex",
+      "ativoSe": {
+        "campo": "luzGiroflex"
+      },
+      "cores": {
+        "alerta": "#FFA500"
+      }
+    }
+  },
+  "status-parking-brake": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "car-brake-parking",
+      "label": "Freio Mão",
+      "ativoSe": {
+        "campo": "freioEstacionamento"
+      },
+      "cores": {
+        "alerta": "#DC3545"
+      }
+    }
+  },
+  "status-hazard": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "hazard-lights",
+      "label": "Pisca Alerta",
+      "ativoSe": {
+        "campo": "piscaAlerta"
+      },
+      "cores": {
+        "alerta": "#DC3545"
+      }
+    }
+  },
+  "status-lights": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "car-light-dimmed",
+      "label": "Luzes",
+      "ativoSe": {
+        "qualquer": [
+          {
+            "campo": "luzesEstacionamento"
+          },
+          {
+            "campo": "farolBaixo"
+          },
+          {
+            "campo": "farolAlto"
+          }
+        ]
+      },
+      "cores": {
+        "alerta": "#28A745"
+      }
+    }
+  },
+  "status-high-beam": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "car-light-high",
+      "label": "Farol Alto",
+      "ativoSe": {
+        "campo": "farolAlto"
+      },
+      "cores": {
+        "alerta": "#007BFF"
+      }
+    }
+  },
+  "status-retarder": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "car-brake-retarder",
+      "label": "Retarder",
+      "ativoSe": {
+        "campo": "retarder",
+        "op": ">",
+        "valor": 0
+      },
+      "cores": {
+        "alerta": "#17A2B8"
+      }
+    }
+  },
+  "status-engine-brake": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "engine-off-outline",
+      "label": "Freio Motor",
+      "ativoSe": {
+        "campo": "freioMotor"
+      },
+      "cores": {
+        "alerta": "#17A2B8"
+      }
+    }
+  },
+  "warning-fuel": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "gas-station-off",
+      "label": "Combustível",
+      "ativoSe": {
+        "campo": "avisoCombustivel"
+      },
+      "cores": {
+        "alerta": "#DC3545"
+      }
+    }
+  },
+  "warning-oil": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "oil-level",
+      "label": "Óleo",
+      "ativoSe": {
+        "campo": "avisoPressaoOleo"
+      },
+      "cores": {
+        "alerta": "#DC3545"
+      }
+    }
+  },
+  "warning-water": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "coolant-temperature",
+      "label": "Água",
+      "ativoSe": {
+        "campo": "avisoTempAgua"
+      },
+      "cores": {
+        "alerta": "#DC3545"
+      }
+    }
+  },
+  "warning-battery": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "battery-alert-variant-outline",
+      "label": "Bateria",
+      "ativoSe": {
+        "campo": "avisoVoltagemBateria"
+      },
+      "cores": {
+        "alerta": "#DC3545"
+      }
+    }
+  },
+  "warning-air": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "air-filter",
+      "label": "Pressão Ar",
+      "ativoSe": {
+        "campo": "avisoPressaoAr"
+      },
+      "cores": {
+        "alerta": "#DC3545"
+      }
+    }
+  },
+  "status-cruise": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "car-cruise-control",
+      "label": "Piloto Auto",
+      "ativoSe": {
+        "campo": "velocidadeCruzeiroKmh",
+        "op": ">",
+        "valor": 0
+      },
+      "cores": {
+        "alerta": "#28A745"
+      }
+    }
+  },
+  "status-diff-lock": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "axis-z-rotate-counterclockwise",
+      "label": "Diferencial",
+      "ativoSe": {
+        "campo": "bloqueioDiferencial"
+      },
+      "cores": {
+        "alerta": "#FFC107"
+      }
+    }
+  },
+  "status-lift-truck": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "svg:EixoCavalo",
+      "label": "Eixo Cavalo",
+      "ativoSe": {
+        "campo": "eixoCaminhaoLevantado"
+      },
+      "cores": {
+        "alerta": "#6F42C1"
+      }
+    }
+  },
+  "status-lift-trailer": {
+    "w": 1,
+    "h": 1,
+    "type": "Alert",
+    "options": {
+      "showLabel": false,
+      "iconName": "svg:EixoCarreta",
+      "label": "Eixo Carreta",
+      "ativoSe": {
+        "campo": "eixoReboqueLevantado"
+      },
+      "cores": {
+        "alerta": "#6F42C1"
+      }
+    }
+  }
+}

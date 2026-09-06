@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:"
+    />
+    <title>Dashlz — Painel</title>
+    <!--
+      Espelho do painel do tablet. Desenha o mesmo layout, a partir do mesmo
+      catálogo em compartilhado/, e o anima com a telemetria real — inclusive sem
+      tablet conectado, que é quando se está conferindo o layout no PC.
+
+      É só leitura: aqui não existe press_key nem robotjs. Os widgets acendem por
+      telemetria e nada mais; clicar num botão não faz nada, de propósito.
+
+      Mesma CSP e mesmas fontes locais do status.html, pelo mesmo motivo — o PC de
+      quem joga costuma estar sem internet.
+    -->
+    <link rel="stylesheet" href="fontes/fontes.css" />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #07090a;
+        --texto: #e6ecea;
+        --muted: #8d9c98;
+        --muted-2: #5f6e6a;
+        --fonte: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+        --mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+
+        /* Fundo da tela do tablet e traço da faixa de menu. As cores dos widgets
+           NÃO estão aqui: cada um recebe as suas em --cor-*, escritas pelo
+           dashboard_renderer.js a partir de options.cores. */
+        --painel-fundo: #0f1014;
+        --painel-borda: #333;
+        --painel-fonte-2: #8a8a8e;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        display: grid;
+        /* cabeçalho / barra de edição (só no modo edição) / área / rodapé */
+        grid-template-rows: 44px auto 1fr 26px;
+        background: var(--bg);
+        color: var(--texto);
+        font-family: var(--fonte);
+        overflow: hidden;
+        user-select: none;
+      }
+
+      /* Cada faixa é fixada explicitamente. Sem isto, com a barra de edição em
+         display:none ela deixa de ser item do grid, e o auto-placement empurra a
+         área para a faixa "auto" e o rodapé para a "1fr" — o painel encolhe e
+         para de ficar centralizado. */
+      header {
+        grid-row: 1;
+      }
+      #barra-edicao {
+        grid-row: 2;
+      }
+      #area {
+        grid-row: 3;
+      }
+      footer {
+        grid-row: 4;
+      }
+
+      /* --- Barra de título (a janela é frameless) --- */
+
+      header {
+        -webkit-app-region: drag;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 6px 0 16px;
+        border-bottom: 1px solid #171d20;
+        background: rgba(10, 13, 14, 0.9);
+      }
+
+      .titulo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      /* O mark de verdade, o mesmo da bandeja e do app. Era um quadrado verde
+         de enfeite. icon.png é o master arredondado, então o border-radius aqui
+         é só garantia caso o arquivo seja trocado por um quadrado. */
+      .marca {
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        flex-shrink: 0;
+        display: block;
+      }
+
+      .titulo .nome {
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #cfd8d5;
+        white-space: nowrap;
+      }
+
+      .selo {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted-2);
+        letter-spacing: 0.06em;
+        padding: 2px 6px;
+        border: 1px solid #1e262a;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+
+      .zoom {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-left: auto;
+      }
+
+      /* Presets do painel. É a casca onde o editor vai morar; por enquanto só
+         troca, duplica, renomeia e exclui — sem edição de grade. */
+      .layouts {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .layouts select,
+      .layouts input {
+        -webkit-app-region: no-drag;
+        height: 24px;
+        max-width: 160px;
+        padding: 0 6px;
+        border: 1px solid #1e262a;
+        border-radius: 5px;
+        background: #0f1416;
+        color: var(--texto);
+        font-family: var(--fonte);
+        font-size: 11px;
+      }
+
+      .zoom button,
+      .layouts button,
+      .acao-editor {
+        -webkit-app-region: no-drag;
+        height: 24px;
+        min-width: 24px;
+        padding: 0 8px;
+        border: 1px solid #1e262a;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--muted);
+        font-family: var(--fonte);
+        font-size: 11px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+      }
+      .zoom button:hover,
+      .layouts button:hover,
+      .acao-editor:hover {
+        background: #161c1f;
+        color: var(--texto);
+      }
+      .layouts button:disabled,
+      .acao-editor:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .layouts button:disabled:hover,
+      .acao-editor:disabled:hover {
+        background: transparent;
+        color: var(--muted);
+      }
+
+      #zoom-valor {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted-2);
+        min-width: 42px;
+        text-align: center;
+      }
+
+      .controles {
+        display: flex;
+        gap: 2px;
+      }
+
+      .window-control {
+        -webkit-app-region: no-drag;
+        width: 38px;
+        height: 32px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: #7b8a86;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s, color 0.15s;
+      }
+      .window-control:hover {
+        background: #161c1f;
+        color: var(--texto);
+      }
+      #close-btn:hover {
+        background: oklch(0.5 0.2 25);
+        color: #fff;
+      }
+
+      /* --- Editor --- */
+
+      #barra-edicao {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-bottom: 1px solid #171d20;
+        background: rgba(12, 15, 17, 0.9);
+        font-size: 11px;
+        color: var(--muted);
+      }
+      body.editando #barra-edicao {
+        display: flex;
+      }
+
+      #barra-edicao input {
+        width: 52px;
+        height: 24px;
+        padding: 0 6px;
+        border: 1px solid #1e262a;
+        border-radius: 5px;
+        background: #0f1416;
+        color: var(--texto);
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+
+      #editor-aviso {
+        margin-left: auto;
+        color: oklch(0.85 0.15 85);
+      }
+
+      #area {
+        display: grid;
+        grid-template-columns: 1fr;
+        overflow: hidden;
+      }
+      body.editando #area {
+        grid-template-columns: 210px 1fr;
+      }
+
+      #paleta {
+        display: none;
+        overflow-y: auto;
+        border-right: 1px solid #171d20;
+        background: rgba(12, 15, 17, 0.9);
+        padding: 6px;
+      }
+      body.editando #paleta {
+        display: block;
+      }
+
+      .paleta-grupo {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted-2);
+        padding: 10px 6px 4px;
+      }
+
+      .paleta-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 5px 6px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--texto);
+        font-family: var(--fonte);
+        font-size: 11px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .paleta-item:hover {
+        background: #161c1f;
+      }
+      /* Na paleta não há widget em volta para definir a cor do ícone. */
+      .paleta-item .icone {
+        color: var(--muted);
+        flex-shrink: 0;
+      }
+      .paleta-item span:last-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* Grade e moldura só aparecem no modo edição. */
+      body.editando #tela {
+        outline: 1px solid #2a3438;
+        background-image: linear-gradient(to right, #171d20 1px, transparent 1px),
+          linear-gradient(to bottom, #171d20 1px, transparent 1px);
+        background-size: 35px 35px;
+      }
+
+      .widget.editavel {
+        cursor: move;
+      }
+      .widget.selecionado {
+        outline: 1px solid var(--painel-acento, #00ff7f);
+        outline-offset: -1px;
+        z-index: 5;
+      }
+
+      .alca {
+        display: none;
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 10px;
+        height: 10px;
+        background: #00ff7f;
+        border-radius: 2px 0 0 0;
+        cursor: nwse-resize;
+      }
+      .widget.selecionado .alca {
+        display: block;
+      }
+
+      /* Prévia que segue o cursor ao arrastar da paleta. */
+      .fantasma {
+        position: fixed;
+        z-index: 50;
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2px;
+        border: 1px dashed var(--painel-acento, #00ff7f);
+        border-radius: 8px;
+        background: rgba(0, 255, 127, 0.12);
+        color: var(--texto);
+        font-size: 10px;
+        text-align: center;
+        overflow: hidden;
+      }
+
+      /* --- Palco --- */
+
+      #palco {
+        position: relative;
+        overflow: auto;
+        background: var(--painel-fundo);
+        display: grid;
+        place-items: center;
+      }
+
+      /* O tablet tem tamanho fixo em células; a janela não. O grid é montado no
+         tamanho real e reduzido por transform, sem mexer em nenhum widget. */
+      #tela {
+        position: relative;
+        transform-origin: center center;
+      }
+
+      .widget {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2px;
+        overflow: hidden;
+      }
+
+      /* IconButton / CircularButton */
+      .botao {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--cor-fundo);
+        border: 1px solid var(--cor-borda);
+        border-radius: 10px;
+      }
+      .widget.aceso .botao {
+        background: var(--cor-fundo-ativa);
+        border-color: var(--cor-borda-ativa);
+      }
+
+      .icone {
+        color: var(--cor-icone);
+        display: flex;
+      }
+      .widget.aceso .icone {
+        color: var(--cor-icone-ativa);
+      }
+      /* Os desenhos não trazem fill próprio, então herdam a cor de quem os contém
+         — é assim que o app recolore o ícone quando o botão acende. */
+      .icone svg {
+        width: 100%;
+        height: 100%;
+        fill: currentColor;
+        display: block;
+      }
+
+      /* iconButtonLabel: absoluto no rodapé da célula, por cima da caixa do
+         botão — não embaixo dela. A caixa ocupa a célula inteira. */
+      .rotulo-botao {
+        position: absolute;
+        bottom: 5px;
+        left: 0;
+        right: 0;
+        color: var(--cor-rotulo);
+        font-size: 10px;
+        font-weight: 700;
+        text-align: center;
+        line-height: 1.1;
+        pointer-events: none;
+      }
+
+      .rotulo {
+        font-weight: 700;
+        text-align: center;
+        line-height: 1.1;
+        max-width: 100%;
+      }
+
+      /* DataDisplay / FuelGauge */
+      .mostrador {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .mostrador .rot {
+        color: var(--cor-rotulo);
+        font-size: 10px;
+        letter-spacing: 0.04em;
+      }
+      .mostrador .val {
+        color: var(--cor-valor);
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      /* Alert */
+      .alerta {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .alerta .icone {
+        width: 24px;
+        height: 24px;
+        color: var(--cor-alerta-apagado);
+      }
+      .alerta .rotulo {
+        font-size: 8px;
+        margin-top: 1px;
+        color: var(--cor-alerta-apagado);
+      }
+      .widget.aceso .alerta .icone {
+        color: var(--cor-alerta);
+      }
+      .widget.aceso .alerta .rotulo {
+        color: var(--cor-valor);
+      }
+
+      /* ColorArea / TextWidget */
+      .area {
+        width: 100%;
+        height: 100%;
+        border-radius: 12px;
+      }
+      .texto {
+        font-weight: 700;
+        text-align: center;
+        color: var(--cor-valor);
+      }
+
+      /* avisoMenu do app: no topo, não no rodapé, e sem uppercase — o texto já
+         vem com a segunda metade em minúsculas. */
+      #faixa {
+        position: absolute;
+        left: 50%;
+        top: 6px;
+        transform: translateX(-50%);
+        padding: 4px 12px;
+        border-radius: 999px;
+        background: rgba(30, 32, 39, 0.92);
+        border: 1px solid var(--painel-borda);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: var(--painel-fonte-2);
+        white-space: nowrap;
+        pointer-events: none;
+      }
+
+      /* --- Rodapé --- */
+
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        border-top: 1px solid #171d20;
+        background: rgba(10, 13, 14, 0.9);
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted-2);
+      }
+
+      #ponto {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--cor-estado, var(--muted-2));
+        flex-shrink: 0;
+      }
+      #ponto.vivo {
+        animation: pulsar 1.6s ease-in-out infinite;
+      }
+      @keyframes pulsar {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+
+      #aviso-leitura {
+        margin-left: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="titulo">
+        <img class="marca" src="icon.png" alt="Dashlz" />
+        <span class="nome">Painel</span>
+        <span class="selo" id="selo-widgets"></span>
+      </div>
+
+      <div class="layouts">
+        <select id="layout-lista" title="Layout ativo"></select>
+        <button id="layout-duplicar" title="Criar uma cópia deste layout">Duplicar</button>
+        <button id="layout-renomear">Renomear</button>
+        <button id="layout-excluir">Excluir</button>
+        <button id="editar-btn" title="Editar este layout">Editar</button>
+        <span id="layout-nome-caixa" hidden>
+          <input id="layout-nome" type="text" maxlength="40" placeholder="Nome do layout" />
+          <button id="layout-ok">OK</button>
+          <button id="layout-cancelar">Cancelar</button>
+        </span>
+      </div>
+
+      <div class="zoom">
+        <button id="zoom-menos" title="Reduzir">−</button>
+        <span id="zoom-valor">100%</span>
+        <button id="zoom-mais" title="Ampliar">+</button>
+        <button id="zoom-ajustar" title="Ajustar à janela">Ajustar</button>
+      </div>
+
+      <div class="controles">
+        <button id="minimize-btn" class="window-control" title="Minimizar">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M4 8a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 4 8" />
+          </svg>
+        </button>
+        <button id="maximize-btn" class="window-control" title="Maximizar">
+          <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+            <path
+              d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"
+            />
+          </svg>
+        </button>
+        <button id="close-btn" class="window-control" title="Fechar">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path
+              d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"
+            />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="barra-edicao">
+      <button id="salvar-btn" class="acao-editor" hidden>Salvar</button>
+      <button id="descartar-btn" class="acao-editor" hidden>Descartar</button>
+      <button id="apagar-btn" class="acao-editor" hidden>Apagar</button>
+      <span>Tela:</span>
+      <input id="tela-colunas" type="number" min="1" max="200" title="Colunas" />
+      <span>×</span>
+      <input id="tela-linhas" type="number" min="1" max="200" title="Linhas" />
+      <span>células</span>
+      <span id="editor-aviso" hidden></span>
+    </div>
+
+    <div id="area">
+      <div id="paleta"></div>
+      <div id="palco">
+        <div id="tela"></div>
+        <div id="faixa" hidden></div>
+      </div>
+    </div>
+
+    <footer>
+      <span id="ponto"></span>
+      <span id="estado-texto">Aguardando telemetria…</span>
+      <span id="aviso-leitura">somente leitura — espelho do tablet</span>
+    </footer>
+
+    <!-- module por causa do await no topo (a lista de widgets vem por IPC).
+         type="module" continua sob script-src 'self'. -->
+    <script type="module" src="dashboard_renderer.js"></script>
+  </body>
+</html>

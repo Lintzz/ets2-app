@@ -47,6 +47,25 @@ contextBridge.exposeInMainWorld("servidor", {
     abrirPagina: () => ipcRenderer.invoke("apk:abrir-pagina"),
   },
 
+  // Layouts do painel (presets). Leitura e gravação ficam no main; aqui só passam.
+  layout: {
+    estado: () => ipcRenderer.invoke("layout:estado"),
+    ativar: (id) => ipcRenderer.invoke("layout:ativar", id),
+    duplicar: (id, nome) => ipcRenderer.invoke("layout:duplicar", id, nome),
+    renomear: (id, nome) => ipcRenderer.invoke("layout:renomear", id, nome),
+    excluir: (id) => ipcRenderer.invoke("layout:excluir", id),
+    salvar: (id, widgets, tela) => ipcRenderer.invoke("layout:salvar", id, widgets, tela),
+  },
+
+  // Painel espelho (dashboard.html). O catálogo é lido e avaliado no processo
+  // principal (painel.js) porque este preload roda em sandbox e não alcança o
+  // sistema de arquivos; aqui só passam a lista de widgets e o estado por quadro.
+  dashboard: {
+    abrir: () => ipcRenderer.send("abrir-dashboard"),
+    painel: () => ipcRenderer.invoke("dashboard:painel"),
+    aoReceberTelemetria: inscrever("dashboard-telemetria"),
+  },
+
   // Eventos
   aoReceberLog: inscrever("server-log"),
   aoMudarStatus: inscrever("server-status"),

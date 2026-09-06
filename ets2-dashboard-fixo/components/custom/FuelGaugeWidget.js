@@ -1,12 +1,16 @@
 import { StyleSheet, Text, View } from "react-native";
+import { resolverCores } from "../../../compartilhado/cores";
 
-const FuelGaugeWidget = ({ telemetry, options, aoVivo = true }) => {
+const FuelGaugeWidget = ({ telemetry, options, aoVivo = true, cores }) => {
   const litros = telemetry?.combustivel;
+  const paleta = cores || resolverCores(options.cores);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{options.label || "COMBUSTÍVEL"}</Text>
-      <Text style={styles.valueText}>
+      <Text style={[styles.label, { color: paleta.rotulo }]}>
+        {options.label || "COMBUSTÍVEL"}
+      </Text>
+      <Text style={[styles.valueText, { color: paleta.valor }]}>
         {aoVivo && typeof litros === "number" ? `${Math.round(litros)} L` : "--"}
       </Text>
     </View>
@@ -22,12 +26,10 @@ const styles = StyleSheet.create({
   },
   
   label: {
-    color: "#8A8A8E",
     fontSize: 10,
   },
 
   valueText: {
-    color: "#EAEAEA",
     fontSize: 18,
     fontWeight: "bold",
   },

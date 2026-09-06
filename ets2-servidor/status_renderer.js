@@ -139,6 +139,12 @@ document.getElementById("close-btn").addEventListener("click", () => {
 
 // --- Ações ---
 
+// Espelho do painel do tablet, numa janela própria. Enquanto ela estiver aberta o
+// servidor mantém o loop de telemetria, mesmo sem nenhum tablet conectado.
+document.getElementById("abrir-painel-btn").addEventListener("click", () => {
+  window.servidor.dashboard.abrir();
+});
+
 document.getElementById("restart-server-btn").addEventListener("click", () => {
   window.servidor.reiniciar();
   inicioUptime = Date.now();

@@ -12,6 +12,7 @@ holding three projects that ship as one product:
 | `ets2-plugin` | C++ DLL loaded by Euro Truck Simulator 2 (SCS SDK 1.14) |
 | `ets2-servidor` | Electron app on the PC — reads shared memory, serves WebSocket |
 | `ets2-dashboard-fixo` | Expo / React Native tablet dashboard |
+| `compartilhado` | widget catalogue + layout, read by the app **and** the server |
 
 It used to be three separate repositories. They were merged because every change
 in the history spanned two or three of them: two contracts are duplicated across
@@ -85,14 +86,97 @@ Adding a new telemetry value end-to-end touches four places:
 1. field in both `TelemetriaCompleta` structs
 2. `REGISTRAR_CANAL(...)` line in `scs_telemetry_init` (`main.cpp`)
 3. `SET_BOOL`/`SET_FLOAT`/`SET_INT` line in `LerDados` (`leitor_memoria.cpp`) — note that speeds are converted to km/h here and exposed under different names (`velocidadeKmh`, `velocidadeCruzeiroKmh`, `navLimiteVelocidadeKmh`)
-4. a widget entry in `ets2-dashboard-fixo/WidgetLibrary.js`
+4. a widget entry in `compartilhado/catalogo-widgets.json`
 5. if the widget presses a key, add it to `TECLAS_PERMITIDAS` in `ets2-servidor/protocolo.js` — keys outside that allowlist are refused
 
 ### Widget model (dashboard app)
 
-`WIDGET_LIBRARY` (`WidgetLibrary.js`) holds *what a widget is* — default `w`/`h`, `type`, and `options` including `iconName` (a MaterialCommunityIcons string, or an SVG component from `SvgLibrary.js`), the `key` sent to robotjs, `isContinuous`, and `isActiveCheck: (telemetry) => boolean` for the lit/unlit state. The `INITIAL_WIDGETS` array in `screens/DashboardScreen.js` holds *where it is* — `widgetKey` + `x`/`y`/`w`/`h` in grid cells. `rehydrateLayout` merges the two. The layout is hardcoded (hence "fixo"); the timestamped `id`s came from a visual editor that is not part of this repo.
+The catalogue and the layout are **JSON in `compartilhado/`**, at the repo root, because the server's mirror window (below) draws the same widgets. See `compartilhado/README.md` for the full grammar.
+
+`catalogo-widgets.json` holds *what a widget is* — 77 entries of `w`/`h`, `type`, and `options` (`iconName`, the `key` sent to robotjs, `isContinuous`, `activeColor`). `layout-padrao.json` holds *where it is* — 88 items of `widgetKey` + `x`/`y`/`w`/`h` in grid cells, which override the catalogue's. `rehydrateLayout` (`screens/DashboardScreen.js`) merges the two. The layout is hardcoded (hence "fixo"); the timestamped `id`s came from a visual editor that is not part of this repo.
+
+**No colour is hardcoded either.** Every widget colour comes from `options.cores`, a
+partial object filled in from `compartilhado/cores.js` — `icone`/`iconeAtiva`,
+`fundo`/`fundoAtiva`, `borda`/`bordaAtiva`, `rotulo`, `valor`, `alerta`/`alertaApagado`.
+The green `#00FF7F` used to be a constant in `DashboardWidget.js` and in
+`dashboardStyles.js`, and only `ColorArea`, `TextWidget` and alerts had any colour at
+all; `color` and `activeColor` are gone, folded into `cores`. Buttons and displays could
+not be painted before, so a colour picker in the editor would have had nowhere to write.
+
+**Nothing in the catalogue is a function.** It used to carry `isActiveCheck: (t) => t.freioEstacionamento` and `value: (t) => ...`; a function cannot be serialised, so the catalogue could not leave the app's bundle. They are now descriptors — `ativoSe: { campo, op?, valor? | qualquer | todos }` and `valor: { campo, escala?, divisor?, casas?, sufixo?, formato? }` — interpreted by `compartilhado/avaliador.js`, the one file both sides call. `iconName` is always a string: a MaterialCommunityIcons name, or `"svg:Nome"`, resolved to a component by `WidgetLibrary.js` in the app and to a drawing from `ets2-servidor/dashboard/icones.json` in the server.
+
+`WidgetLibrary.js` is now only that resolution step — it re-exports `WIDGET_LIBRARY` in the same shape as before, so the rest of the app did not change. `metro.config.js` needs `watchFolders` for Metro to see outside the app folder at all.
 
 `DashboardWidget.js` dispatches on `config.type` (`ColorArea`, `TextWidget`, `CircularButton`, `IconButton`, `DataDisplay`, `FuelGauge`, `Alert`) and turns presses into `pressKey` / `holdKeyDown` + `holdKeyUp` depending on `options.isContinuous`.
+
+### Layouts: presets and how one reaches the tablet
+
+`compartilhado/layout-padrao.json` is the factory panel and the floor under everything —
+it is what lets the tablet open with no server and no network. What the user creates
+lives in `userData/layouts.json` on the PC (`ets2-servidor/layouts.js`), never in
+`compartilhado/`, which is read-only inside `resources/` once packaged. `"padrao"` is
+always a valid id and is **not** in the file, so "Restaurar padrão" survives a corrupt
+one. Writes are atomic (tmp + rename): `salvarConfig` writes straight through, which is
+fine for two keys and not for every preset the user has.
+
+The active layout reaches the tablet over the WebSocket that is already paired, right
+after the `welcome`, and again on every preset change — `main.js` → `serverProcess.send`
+→ `server.js`, the same parent→child channel as `preview`. `validarLayout`
+(`compartilhado/validar-layout.js`) runs on both ends, the server on write and the app on
+receive; a bad item is dropped rather than taking the panel down.
+
+**The server only sends `layout` to a client that declared `recursos: ["layout"]` in its
+`hello`.** This is not a nicety. The app's `onmessage` ends in `setTelemetry(dados)`, so
+anything it does not recognise becomes telemetry — an older APK would render the layout
+object as readings. The server updates itself through update.electronjs.org while the APK
+does not, so that pairing genuinely occurs. Bumping `PROTOCOLO_VERSAO` would have been the
+wrong lever: `server.js` refuses anything below the current version, so every older APK
+would stop connecting.
+
+On the app side `useTelemetry` intercepts the message before that fallback, caches it in
+AsyncStorage (`ets2:layout`), and `DashboardScreen` picks its source in order:
+**just received → cached → bundled factory layout**.
+
+A layout may declare `tela: { colunas, linhas }` in cells — the tablet's screen
+frame, which the editor draws and uses to flag widgets that fall outside it. Without
+it the old behaviour holds: the app measures the bounds of what exists and centres the
+block. `layout-padrao.json` stays a bare array, because changing the file's shape would
+break the app's bundled fallback. A widget outside the frame is **reported, never
+dropped** — what fits on the tablet is the owner's call.
+
+### The mirror window (server)
+
+`ets2-servidor/dashboard.html` draws the same panel on the PC and animates it with real telemetry — **read-only**: there is no `press_key` path out of it, on purpose. Opened from "Abrir painel" in `status.html` or from the tray.
+
+The catalogue is read and evaluated in the **main process** (`painel.js`), not in the preload: Electron preloads are sandboxed, where `require` only yields `electron`/`events`/`timers`/`url` and loading `compartilhado/` fails with `module not found: path`. The window gets the widget list once over `dashboard:painel`, then one frame at a time carrying only each widget's state (lit/unlit and the text). So `dashboard_renderer.js` is pure DOM and cannot drift from the app on its own.
+
+`server.js` only ran the 20 Hz loop while a tablet was authenticated. The window now counts as a consumer: `main.js` sends `{type:"preview", ativo}` when it opens and closes, and `previewAtivo` keeps the loop alive — that is what lets you check a layout on the PC with no tablet in reach. Frames to the window are throttled to every third tick (~7 Hz); the tablet still gets all 20. `startServerProcess` re-sends the flag after each fork, otherwise "Reiniciar servidor" would leave the window frozen.
+
+The window's header also carries the preset bar — pick, duplicate, rename, delete. There
+is no grid editing yet; it is the shell the editor will live in. Switching preset makes
+`main.js` reload the window, because the renderer builds its widgets once at load.
+
+### The editor
+
+`dashboard_editor.js` turns the mirror into an editor: select, drag, resize, delete and
+add widgets from the palette, with the grid and the screen frame drawn, Ctrl+Z, and an
+explicit Salvar. It works on the **raw layout** — the same shape that goes to disk and to
+the tablet — so nothing is translated on the way. Dragging moves the node's style
+directly; only structural changes go through `remontar()`.
+
+Two details that are easy to get wrong. Pointer deltas are divided by the zoom scale,
+or the widget drifts away from the cursor at any zoom but 100% — which is the normal
+case, since the window is usually smaller than the panel. And entering the editor
+*ensures* a `tela`, deriving one from the current bounds if absent: with a frame the
+grid origin is (0,0) and the arithmetic stays direct. The factory layout has no frame
+and is not editable, so it is never touched by this.
+
+Editing `padrao` is refused; the Editar button duplicates it first. While there are
+unsaved changes, newly added widgets stay unlit — `avaliarPainel` runs in the main
+process over the *saved* layout and does not know the new ids yet. Freezing telemetry
+in edit mode would have hidden that; this way nothing lies.
+
+Icons: the window is plain HTML, with no MaterialCommunityIcons font and no SVG transformer. `npm run gerar:icones` extracts the 35 MDI icons the catalogue names (from `@mdi/js`, a devDependency) plus the 12 own SVGs (read from the app's `assets/`) into `dashboard/icones.json` — 24 KB, against 1.3 MB for the whole `.ttf`. Re-run it after adding a widget with a new icon.
 
 ## Commands
 
@@ -289,21 +373,20 @@ preference — it depends on whether the platform applies its own mask.
 | Target | File | Source | Why |
 |---|---|---|---|
 | Windows exe + tray | `ets2-servidor/icon.ico` | rounded | Windows never masks; a square would be a hard black block |
-| Android legacy / stores | `assets/icon.png` | rounded | used as-is by old launchers |
-| Android adaptive fg | `assets/adaptive-icon.png` | rounded, **scaled down** | the system masks it — see below |
+| Android legacy / stores | `assets/icon.png` | **square**, as-is | used as-is by old launchers |
+| Android adaptive fg | `assets/adaptive-icon.png` | square, artwork at full size | the system masks it — see below |
 | Android themed | `assets/monochrome-icon.png` | same as adaptive | Android 13+ tints it |
 | Splash | `assets/splash-icon.png` | artwork only, transparent | floats on the splash background |
 
 The adaptive foreground carries the master's artwork **unchanged in
-composition** — the gauge plus the "Lz" in its bottom-right corner, exactly the
-arrangement the Windows tray shows — only scaled down so nothing is clipped. An
-adaptive icon guarantees just a central circle of 66/108 of the canvas, and the
-artwork's outermost pixels sit at the corners of its own bounding box, so the
-enclosing radius is what fixes the size: on a 1024 canvas the art lands at
-**444 px**, 43% of it. At full size the "Lz" is eaten by every circular mask (the
-Pixel launcher's); at 485 px it touches the 72/108 mask edge, which the launcher
-scale animations can still cross. The dark plate is not painted into the
-foreground — `adaptiveIcon.backgroundColor` `#0B0B0B` in `app.json` is the
+composition and at full size** — the gauge plus the "Lz" in its bottom-right
+corner, exactly the arrangement the Windows tray shows, in the same position it
+occupies on the 1024 master. An adaptive icon guarantees only a central circle
+of 66/108 of the canvas, so at this size a circular mask (the Pixel launcher's)
+eats the "Lz". **That is a deliberate choice by the owner** — the mark reads
+bigger and the clipping is accepted; do not shrink the artwork back down. (An
+earlier version scaled it to 444 px, 43% of the canvas, so nothing was clipped.)
+The dark plate is not painted into the foreground — `adaptiveIcon.backgroundColor` `#0B0B0B` in `app.json` is the
 background layer and the mask gives it its shape. An earlier version recomposed
 the artwork instead (gauge centred, "Lz" moved into the gauge's open bottom) to
 buy size; that was dropped so the phone and the tray show the same mark. Masters
@@ -320,15 +403,15 @@ magick "lz-icon-1024-quadrado.png" -alpha off -colorspace sRGB \
   -fill white -colorize 100 -colorspace sRGB arte.png
 ```
 
-Then square `arte.png` on its own bounding box and scale it to 444 px on a
-transparent 1024 canvas. That is `adaptive-icon.png` and `monochrome-icon.png`,
-byte for byte the same file:
+`arte.png` is already the 1024 canvas with the artwork where the master puts it,
+so no trim or resize follows — it is written straight out as `adaptive-icon.png`
+and `monochrome-icon.png`, byte for byte the same file:
 
 ```bash
-magick arte.png -trim +repage -background none -gravity center -extent 777x777 \
-  -resize 444x444 -extent 1024x1024 -colorspace sRGB -type TrueColorAlpha \
-  PNG32:adaptive-icon.png
+magick arte.png -colorspace sRGB -type TrueColorAlpha PNG32:adaptive-icon.png
 ```
+
+`assets/icon.png` is the square master copied verbatim, plate and all.
 
 For `icon.ico`, sizes
 16/24/32 get `-channel RGB -level 0%,72%` before packing: the 1 px arc turns mid

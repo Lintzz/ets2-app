@@ -1,6 +1,6 @@
 {
   "name": "dashlz",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Dashlz — servidor para o dashboard do Euro Truck Simulator 2, com addon nativo para leitura de memória.",
   "repository": {
     "type": "git",
@@ -13,7 +13,8 @@
     "make": "electron-forge make",
     "build:addon": "node scripts/build-addon.js",
     "install": "node scripts/build-addon.js",
-    "test": "node testes/pareamento.js"
+    "test": "node testes/avaliador.js && node testes/layout.js && node testes/pareamento.js",
+    "gerar:icones": "node scripts/gerar-icones.js"
   },
   "keywords": [
     "ets2",
@@ -38,6 +39,7 @@
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
     "@electron-forge/maker-squirrel": "^7.11.2",
+    "@mdi/js": "^7.4.47",
     "electron": "^44.1.1",
     "node-gyp": "^11.4.2"
   },
@@ -51,7 +53,8 @@
         "executableName": "Dashlz",
         "icon": "icon",
         "extraResource": [
-          "recursos/PluginETS2.dll"
+          "recursos/PluginETS2.dll",
+          "../compartilhado"
         ]
       },
       "rebuildConfig": {

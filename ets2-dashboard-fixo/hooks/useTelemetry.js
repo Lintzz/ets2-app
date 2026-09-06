@@ -4,15 +4,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Crypto from "expo-crypto";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
+import catalogo from "../../compartilhado/catalogo-widgets.json";
+import { validarLayout } from "../../compartilhado/validar-layout";
 import { identificar, varrerSubRede } from "./descoberta";
 import {
   BACKOFF_MS,
   CHAVE_DEVICE_ID,
+  CHAVE_LAYOUT,
   CHAVE_SEGREDO,
   CHAVE_ULTIMO_IP,
   CODIGO_DIGITOS,
   montarProva,
   PROTOCOLO_VERSAO,
+  RECURSOS,
   RECUSA,
   TCP_PORT,
   TIMEOUT_IP_CONHECIDO_MS,
@@ -56,6 +60,9 @@ export function useTelemetry() {
   const [servidor, setServidor] = useState(null);
   const [progresso, setProgresso] = useState(null);
   const [erroPareamento, setErroPareamento] = useState(null);
+  // Layout vindo do PC, como { widgets, tela }. null enquanto nada chegou; o
+  // DashboardScreen decide entre este, o guardado no aparelho e o de fábrica.
+  const [layout, setLayout] = useState(null);
 
   // Tudo que não precisa redesenhar a tela vive em ref: a versão anterior
   // guardava o WebSocket em estado e o próprio efeito o alterava, o que fazia
@@ -126,6 +133,7 @@ export function useTelemetry() {
           protocolo: PROTOCOLO_VERSAO,
           deviceId: deviceIdRef.current,
           nome: nomeDoAparelho(),
+          recursos: RECURSOS,
         };
 
         const segredo = await lerSegredo();
@@ -186,6 +194,18 @@ export function useTelemetry() {
               : "precisa-codigo"
         );
         fecharSocket();
+        return;
+      }
+
+      // Antes do fallback: tudo que sobra aqui é tratado como telemetria.
+      if (dados && dados.type === "layout") {
+        // Veio da rede: valida antes de virar tela. Item ruim é descartado, o
+        // resto do painel continua de pé.
+        const r = validarLayout(dados.widgets, catalogo, { tela: dados.tela });
+        if (!r.ok) return;
+        const recebido = { widgets: r.layout, tela: r.tela };
+        setLayout(recebido);
+        AsyncStorage.setItem(CHAVE_LAYOUT, JSON.stringify(recebido)).catch(() => {});
         return;
       }
 
@@ -369,6 +389,7 @@ export function useTelemetry() {
     estado,
     isConnected: estado === "conectado",
     telemetry,
+    layout,
     servidor,
     progresso,
     erroPareamento,
